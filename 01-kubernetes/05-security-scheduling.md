@@ -432,4 +432,9 @@ spec:
 - [ ] 能解釋汙點與容忍的方向(節點排斥 Pod),三種 effect 的差異,以及與 affinity 的搭配
 - [ ] 理解「容忍只是允許、不保證會去」,需搭配 affinity 才能真正吸引 Pod
 
-> 恭喜完成第一階段 Kubernetes 核心。回到 [README.md](./README.md) 對照整體檢核點,把不熟的章節再走一遍。接著就可以挑戰 CKA,或往 Helm、Operator、GitOps、可觀測性等進階主題前進。
+> 你已完成 Kubernetes 的核心主線(1–5 章)。接下來三章是緊接其後的深化,建議一併讀完再進入 EKS:
+> - 下一章:[06-pod-lifecycle.md](./06-pod-lifecycle.md) — Pod 從生到死的完整生命週期與優雅關閉(接續本章的探針與 OOMKilled)。
+> - [07-security-context.md](./07-security-context.md) — 容器安全與加固(本章管「誰能操作叢集」,第 7 章管「容器以什麼身分、能做什麼」)。
+> - [08-helm-debug-observability.md](./08-helm-debug-observability.md) — Helm/Kustomize、進階除錯與可觀測性。
+>
+> 全部走完後,回到 [README.md](./README.md) 對照整體檢核點,就可以挑戰 CKA 或前進 EKS 階段。
