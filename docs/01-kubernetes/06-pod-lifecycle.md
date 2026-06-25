@@ -227,11 +227,11 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-    subgraph 沒有 preStop sleep
+    subgraph NOPRESTOP["沒有 preStop sleep"]
       A1[SIGTERM 到達<br/>應用開始關閉] -.同時.-> A2[endpoint 還沒傳播完<br/>仍有流量打進來]
       A2 --> A3[💥 新請求打到關閉中的 Pod<br/>使用者看到 5xx]
     end
-    subgraph 有 preStop sleep 5~10s
+    subgraph WITHPRESTOP["有 preStop sleep 5~10s"]
       B1[preStop: sleep 緩衝] --> B2[這段時間 endpoint 傳播完成<br/>新流量已不再導入]
       B2 --> B3[sleep 結束 → 才送 SIGTERM<br/>此時關閉很安全]
     end

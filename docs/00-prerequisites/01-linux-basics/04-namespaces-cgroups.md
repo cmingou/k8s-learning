@@ -16,7 +16,7 @@
 
 ```mermaid
 graph TB
-    subgraph 錯誤想像:容器 = 迷你虛擬機
+    subgraph WRONG["錯誤想像:容器 = 迷你虛擬機"]
         direction TB
         VMx[容器有自己的作業系統核心?]
     end
