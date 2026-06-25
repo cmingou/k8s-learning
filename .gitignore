@@ -1,0 +1,8 @@
+# MkDocs 建置產物
+/site/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
