@@ -6,7 +6,7 @@ site_author: cmingou
 site_url: ""
 repo_url: https://github.com/cmingou/k8s-learning
 repo_name: cmingou/k8s-learning
-edit_uri: edit/claude/gallant-keller-eoqoul/docs/
+edit_uri: edit/main/docs/
 
 theme:
   name: material

@@ -6,7 +6,7 @@ name: Deploy docs to GitHub Pages
 on:
   push:
     branches:
-      - claude/gallant-keller-eoqoul   # 之後合進 main,改成 main 即可
+      - main                            # 合併進 main 後自動建置部署
   workflow_dispatch:                    # 也可在 Actions 頁手動觸發
 
 permissions:
