@@ -1,0 +1,101 @@
+site_name: K8s / EKS / eBPF 學習筆記
+site_description: 從 Linux 基礎到 Kubernetes、EKS、eBPF 的結構化繁體中文學習筆記
+site_author: cmingou
+# 部署到 GitHub Pages 後,網址會是 https://<帳號>.github.io/k8s-learning/
+# 若改用自訂網域或 main 分支,調整這裡即可
+site_url: ""
+repo_url: https://github.com/cmingou/k8s-learning
+repo_name: cmingou/k8s-learning
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: zh-Hant            # 繁體中文介面
+  features:
+    - navigation.instant       # 像單頁應用一樣即時切換(手機更順)
+    - navigation.tracking      # 網址跟著捲動更新
+    - navigation.top           # 回到頂端按鈕
+    - navigation.indexes       # 資料夾 README 當作該節首頁
+    - navigation.footer        # 上一頁/下一頁
+    - search.suggest
+    - search.highlight
+    - content.code.copy        # 程式碼一鍵複製
+    - toc.follow
+  palette:
+    # 淺色 / 深色模式切換(手機夜讀友善)
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: 切換到深色模式
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: 切換到淺色模式
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # 用 Unicode/GitHub 相容的 slug,讓中文標題錨點與檔內目錄連結一致
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        # 讓 ```mermaid 區塊在前端渲染成圖
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search:
+      lang:
+        - en          # Material 內建搜尋對中文採字元切分,英文術語另列加強命中
+      separator: '[\s​\-]+'
+
+nav:
+  - 首頁: index.md
+  - 階段 0・前置基礎:
+      - 總覽: 00-prerequisites/README.md
+      - Linux 基礎:
+          - 總覽: 00-prerequisites/01-linux-basics/README.md
+          - 1・Shell 與檔案系統: 00-prerequisites/01-linux-basics/01-shell-filesystem.md
+          - 2・行程管理: 00-prerequisites/01-linux-basics/02-process-management.md
+          - 3・使用者與權限: 00-prerequisites/01-linux-basics/03-users-permissions.md
+          - 4・命名空間與 cgroup: 00-prerequisites/01-linux-basics/04-namespaces-cgroups.md
+          - 5・服務與日誌: 00-prerequisites/01-linux-basics/05-systemd-logs-package.md
+      - 容器與 Docker: 00-prerequisites/02-container-docker/README.md
+      - 網路基礎: 00-prerequisites/03-networking/README.md
+      - AWS 基礎: 00-prerequisites/04-aws-basics/README.md
+  - 階段 1・Kubernetes:
+      - 總覽: 01-kubernetes/README.md
+      - 1・架構與元件: 01-kubernetes/01-architecture.md
+      - 2・Pod 與工作負載: 01-kubernetes/02-pod-workloads.md
+      - 3・網路與服務: 01-kubernetes/03-networking-service.md
+      - 4・設定與儲存: 01-kubernetes/04-config-storage.md
+      - 5・安全與排程: 01-kubernetes/05-security-scheduling.md
+      - 6・Pod 生命週期與優雅關閉: 01-kubernetes/06-pod-lifecycle.md
+      - 7・容器安全與加固: 01-kubernetes/07-security-context.md
+      - 8・Helm、除錯與可觀測性: 01-kubernetes/08-helm-debug-observability.md
+  - 階段 2・EKS: 02-eks/README.md
+  - 階段 3・eBPF: 03-ebpf/README.md
+  - 附錄・資源: 99-resources/README.md

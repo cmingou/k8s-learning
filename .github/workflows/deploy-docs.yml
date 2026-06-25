@@ -1,0 +1,48 @@
+name: Deploy docs to GitHub Pages
+
+# 推到開發分支時自動建置並發布文件網站
+# ⚠️ 啟用前提:到 GitHub repo → Settings → Pages → Build and deployment
+#    的 Source 選「GitHub Actions」
+on:
+  push:
+    branches:
+      - main                            # 合併進 main 後自動建置部署
+  workflow_dispatch:                    # 也可在 Actions 頁手動觸發
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時間只跑一個部署,新的會取代排隊中的
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: 安裝相依套件
+        run: pip install -r requirements.txt
+      - name: 建置靜態網站
+        run: mkdocs build --strict
+      - name: 上傳 Pages 產物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
