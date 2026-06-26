@@ -86,6 +86,18 @@ flowchart LR
 
 ### 3.1 ClusterIP(預設,最常用)
 
+只在叢集內可達:給一群 Pod 一個固定虛擬 IP,**外部完全連不進來**。
+
+```mermaid
+flowchart LR
+    subgraph CLUSTER["叢集內部"]
+        C["其他 Pod<br/>(呼叫方)"] --> SVC["ClusterIP<br/>10.96.0.10<br/>(虛擬 IP)"]
+        SVC --> P1["Pod :8080"]
+        SVC --> P2["Pod :8080"]
+    end
+    EXT["外部使用者"] -. 連不進來 .-x SVC
+```
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -102,7 +114,19 @@ spec:
 
 ### 3.2 NodePort
 
-在「每一台節點」上開一個固定埠(30000-32767),外部用任一節點 IP 加這個埠就能進來。
+在「每一台節點」上開一個固定埠(30000-32767),外部用任一節點 IP 加這個埠就能進來。**每台節點都監聽同一個埠**,打到哪台都會被轉進內部的 ClusterIP。
+
+```mermaid
+flowchart LR
+    EXT["外部使用者"] -->|"任一 NodeIP:30080"| N1
+    EXT -->|"任一 NodeIP:30080"| N2
+    subgraph CLUSTER["叢集"]
+        N1["Node 1<br/>:30080"] --> SVC["ClusterIP<br/>10.96.0.10"]
+        N2["Node 2<br/>:30080"] --> SVC
+        SVC --> P1["Pod"]
+        SVC --> P2["Pod"]
+    end
+```
 
 ```yaml
 apiVersion: v1
@@ -123,7 +147,20 @@ spec:
 
 ### 3.3 LoadBalancer
 
-請雲端供應商配一個外部負載平衡器,給你一個對外 IP。本機(kind/minikube)沒有真正的雲端 LB,可以用 `minikube tunnel` 或 MetalLB 模擬。
+請雲端供應商配一個外部負載平衡器,給你一個對外 IP。本機(kind/minikube)沒有真正的雲端 LB,可以用 `minikube tunnel` 或 MetalLB 模擬。流量路徑是 **雲端 LB → 各節點的 NodePort → ClusterIP → Pod**,層層疊加。
+
+```mermaid
+flowchart LR
+    EXT["外部使用者"] -->|"對外 IP"| LB["雲端負載平衡器<br/>(AWS ELB / GCP LB...)"]
+    subgraph CLUSTER["叢集"]
+        LB --> N1["Node 1<br/>:30080 (NodePort)"]
+        LB --> N2["Node 2<br/>:30080 (NodePort)"]
+        N1 --> SVC["ClusterIP<br/>10.96.0.10"]
+        N2 --> SVC
+        SVC --> P1["Pod"]
+        SVC --> P2["Pod"]
+    end
+```
 
 ```yaml
 apiVersion: v1
@@ -141,7 +178,14 @@ spec:
 
 ### 3.4 ExternalName
 
-不選 Pod,而是把一個叢集內名字對應到外部 DNS(回傳 CNAME)。用來把「外部資料庫」包裝成像叢集內服務一樣呼叫。
+不選 Pod,而是把一個叢集內名字對應到外部 DNS(回傳 CNAME)。用來把「外部資料庫」包裝成像叢集內服務一樣呼叫。**沒有 selector、沒有 ClusterIP、不做任何代理**——它純粹是 DNS 層的別名。
+
+```mermaid
+flowchart LR
+    P["叢集內 Pod"] -->|"① 查 external-db"| DNS["CoreDNS"]
+    DNS -->|"② 回傳 CNAME<br/>db.example.com"| P
+    P ==>|"③ 直接連外部"| EXTDB[("外部資料庫<br/>db.example.com")]
+```
 
 ```yaml
 apiVersion: v1
@@ -155,7 +199,15 @@ spec:
 
 ### 3.5 Headless Service(無頭服務)
 
-特例:把 `clusterIP` 設成 `None`。這時 Service **不分配虛擬 IP、不做負載平衡**,而是讓 DNS 直接回傳「所有後端 Pod 的 IP」。第 2 章的 StatefulSet 就靠它給每個 Pod 固定 DNS(`web-0.web...`)。
+特例:把 `clusterIP` 設成 `None`。這時 Service **不分配虛擬 IP、不做負載平衡**,而是讓 DNS 直接回傳「所有後端 Pod 的 IP」。對照前面幾種類型「先連到一個 VIP 再分流」,無頭服務是**把整份 Pod IP 清單交給呼叫方,由呼叫方自己決定連哪個**。第 2 章的 StatefulSet 就靠它給每個 Pod 固定 DNS(`web-0.web...`)。
+
+```mermaid
+flowchart LR
+    P["呼叫方 Pod"] -->|"查 web 的 DNS"| DNS["CoreDNS"]
+    DNS -->|"直接回傳全部 Pod IP<br/>(無虛擬 IP、不分流)"| P
+    P --> P1["Pod web-0<br/>10.0.0.5"]
+    P --> P2["Pod web-1<br/>10.0.0.6"]
+```
 
 ```yaml
 apiVersion: v1
