@@ -282,6 +282,49 @@ kubectl get hpa -w               # 觀察副本數隨負載變化
 
 ---
 
+## 7.1 In-Place Pod Resize:不重啟容器修改資源(K8s 1.33+ Beta,1.35 Stable)
+
+傳統上改一個容器的 `requests` / `limits` 只有一條路:**刪掉 Pod 再重建**——這對資料庫等有狀態服務極為痛苦。**In-Place Pod Resize** 讓你在不重啟容器的情況下就地調整 CPU / 記憶體配額。
+
+> **版本時間軸**:Alpha(1.27)→ Beta 且預設啟用(1.33)→ **Stable GA(1.35)**
+
+```bash
+# 就地修改 running Pod 的資源配額(不重啟容器,K8s 1.33+)
+kubectl patch pod my-pod --subresource=resize --type=merge \
+  -p '{"spec":{"containers":[{"name":"app","resources":{"requests":{"cpu":"500m","memory":"512Mi"},"limits":{"cpu":"1","memory":"1Gi"}}}]}}'
+
+# 觀察 resize 的狀態
+kubectl get pod my-pod -o jsonpath='{.status.resize}{"\n"}'
+# 可能值: Proposed(建議中) → InProgress(套用中) → Applied(成功) / Infeasible(節點資源不足)
+```
+
+**控制哪些資源需要重啟**(`resizePolicy`):
+
+```yaml
+spec:
+  containers:
+    - name: app
+      image: my-app:1.0
+      resizePolicy:
+        - resourceName: cpu
+          restartPolicy: NotRequired     # CPU 改動直接套用,不重啟(預設)
+        - resourceName: memory
+          restartPolicy: RestartContainer  # 記憶體改動需要重啟容器(因記憶體不可壓縮)
+```
+
+> **與 VPA 的結合**:VPA (Vertical Pod Autoscaler) 分析歷史使用量並建議資源值。傳統 VPA 需要刪 Pod 才能套用建議;In-Place Resize 讓 VPA 可以就地調整,不中斷服務——這是 VPA 真正「無縫」的使用方式。
+>
+> **與 HPA 的配合**:HPA 控制 Pod **數量**,In-Place Resize 控制每個 Pod 的**資源大小**。兩者都是橫向擴充能力的一部分,但解決不同層次的問題。
+
+```bash
+# 驗證:觀察 resize 成功後,容器 CPU 配額是否已改變
+kubectl describe pod my-pod | grep -A5 "Requests:"
+```
+
+📖 **官方文件**:[Resize CPU and Memory Resources assigned to Containers](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/)
+
+---
+
 ## 第三部分:排程 (Scheduling)
 
 ## 8. 排程基礎:Pod 怎麼被放到節點上

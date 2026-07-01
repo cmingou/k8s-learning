@@ -341,8 +341,230 @@ spec:
 | NodePort | L4 | 否 | 用節點 IP | 測試 |
 | LoadBalancer | L4 | 否 | 每服務一個 | 單一服務對外、非 HTTP 流量 |
 | Ingress | L7 | 是 | 一個共用入口 | 多個 HTTP 服務共用入口 |
+| **Gateway API** | L4–L7 | 是(更強大) | 一個共用入口 | 新叢集推薦,取代 Ingress |
 
-> 補充:較新的 **Gateway API** 是 Ingress 的演進版,功能更完整、更標準化。學習階段先精通 Ingress,知道 Gateway API 是未來方向即可。
+---
+
+### 5.3 Gateway API:Ingress 的官方演進版
+
+**Gateway API** 是 Kubernetes SIG Network 推出的新一代進出口流量 (ingress/egress) API。**Gateway API v1.0 於 2023 年 10 月正式宣告 GA(核心資源晉升 v1 穩定版)**,是官方認可的 Ingress 演進路徑。
+
+> **來源**:
+> - [Kubernetes 官方文件:Gateway API](https://kubernetes.io/docs/concepts/services-networking/gateway/)
+> - [Gateway API 官方文件](https://gateway-api.sigs.k8s.io/)
+> - [K8s Blog:Gateway API v1.0 GA 公告](https://kubernetes.io/blog/2023/10/31/gateway-api-ga/)
+> - [K8s Blog:Gateway API v1.1 GA 公告](https://kubernetes.io/blog/2024/05/09/gateway-api-v1-1/)
+
+#### 為什麼 Ingress 不夠用?
+
+| Ingress 的痛點 | 說明 |
+|----------------|------|
+| **功能受限** | 標準只定義 host/path 路由;Header 路由、流量權重等功能靠各家自訂 annotation,**不可移植** |
+| **沒有角色分工** | 一個 Ingress 物件混合了「基礎設施設定」與「應用路由規則」,開發者和平台 Ops 改同一份 YAML |
+| **協定支援有限** | 只設計給 HTTP/HTTPS,TCP/UDP/gRPC 沒有標準路徑 |
+| **跨命名空間受限** | 無法讓不同 namespace 的路由規則共用同一個 Gateway |
+
+#### 核心設計:三層角色分工 (Role-Oriented)
+
+Gateway API 最大的突破是把「誰管什麼」明確拆成三個角色與三種資源:
+
+```mermaid
+flowchart TB
+    subgraph IP["① 基礎設施提供者 Infrastructure Provider"]
+        GC["GatewayClass<br/>(定義閘道實作類型:<br/>nginx / cilium / envoy…)"]
+    end
+    subgraph CO["② 叢集維運者 Cluster Operator"]
+        GW["Gateway<br/>(閘道實例:<br/>定義 Listener / 埠 / TLS)"]
+    end
+    subgraph AD["③ 應用開發者 Application Developer"]
+        R1["HTTPRoute<br/>(HTTP 路由規則)"]
+        R2["GRPCRoute<br/>(gRPC 路由規則)"]
+    end
+    GC -->|"gatewayClassName"| GW
+    GW -->|"parentRefs"| R1
+    GW -->|"parentRefs"| R2
+    R1 --> SVC1["Service A"]
+    R1 --> SVC2["Service B"]
+    R2 --> SVC3["Service C"]
+```
+
+平台團隊控制 Gateway 層(流量入口的設定與安全);應用團隊控制 Route 層(路由規則)——各司其職,不需要互相等待。
+
+#### 穩定版核心資源 (Standard Channel)
+
+| 資源 | API 版本 | 穩定狀態 | 說明 |
+|------|---------|---------|------|
+| **GatewayClass** | `v1` | ✅ Stable (v1.0.0) | 閘道實作類型,對應一個 controller |
+| **Gateway** | `v1` | ✅ Stable (v1.0.0) | 閘道實例,定義 Listener(埠/協定/TLS) |
+| **HTTPRoute** | `v1` | ✅ Stable (v1.0.0) | HTTP/HTTPS 路由規則 |
+| **GRPCRoute** | `v1` | ✅ Stable (v1.1.0) | gRPC 路由規則 |
+| **ReferenceGrant** | `v1beta1` | ✅ Standard Channel | 授權跨命名空間引用 |
+
+> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。TCPRoute / UDPRoute / TLSRoute 目前在實驗性 (Experimental) Channel。
+
+#### 安裝 Gateway API CRD
+
+```bash
+# 安裝 Standard Channel(穩定版):GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant
+# 版本請至 https://github.com/kubernetes-sigs/gateway-api/releases 確認最新版
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/latest/download/standard-install.yaml
+
+# 確認 CRD 安裝成功
+kubectl get crd | grep gateway.networking.k8s.io
+```
+
+#### 完整 YAML 範例:三層分工實作路由
+
+**第一層:GatewayClass(基礎設施提供者建立,通常已預裝)**
+
+```yaml
+# GatewayClass:宣告「使用哪個 controller 實作閘道」
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: nginx
+spec:
+  controllerName: gateway.nginx.org/nginx-gateway-fabric
+```
+
+**第二層:Gateway(叢集 Ops 建立)**
+
+```yaml
+# Gateway:實際的閘道實例,定義 Listener(對外的埠/協定/TLS)
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: prod-gateway
+  namespace: infra          # Gateway 通常放在基礎設施命名空間
+spec:
+  gatewayClassName: nginx   # 對應哪個 GatewayClass
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All         # 允許所有命名空間的 Route 附掛
+    - name: https
+      port: 443
+      protocol: HTTPS
+      tls:
+        certificateRefs:
+          - name: shop-tls  # TLS 憑證 Secret(在 infra 命名空間)
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway-access: "true"  # 只允許貼了此標籤的命名空間
+```
+
+**第三層:HTTPRoute(應用開發者建立)**
+
+```yaml
+# HTTPRoute:HTTP 路由規則,可和 Gateway 在不同命名空間
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: shop-route
+  namespace: shop-ns        # 應用自己的命名空間(與 Gateway 不同!)
+spec:
+  parentRefs:
+    - name: prod-gateway
+      namespace: infra      # 附掛到哪個 Gateway
+      sectionName: https    # 附掛到哪個 Listener
+  hostnames:
+    - shop.example.com
+  rules:
+    # 規則一:依路徑路由
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: api-svc
+          port: 80
+    # 規則二:進階功能 — 依 Header 做金絲雀路由(Ingress 標準做不到!)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          headers:
+            - name: X-Canary
+              value: "true"
+      backendRefs:
+        - name: web-canary
+          port: 80
+    # 規則三:主路徑,帶流量權重(可做 A/B testing)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: web-stable     # 90% 流量打到穩定版
+          port: 80
+          weight: 90
+        - name: web-canary     # 10% 流量打到金絲雀版
+          port: 80
+          weight: 10
+```
+
+> 流量權重 (weight) 讓**金絲雀發布 (Canary Deployment)** 和 **藍綠部署 (Blue-Green)** 變得原生可設定,不再需要靠複雜的 annotation 或 Service Mesh。
+
+#### 跨命名空間路由:ReferenceGrant
+
+HTTPRoute 可以附掛到另一個命名空間的 Gateway,但**需要 Gateway 所在命名空間的 ReferenceGrant 授權**,以防止惡意 Route 跨 namespace 「劫持」流量:
+
+```yaml
+# ReferenceGrant:允許 shop-ns 命名空間的 Route 引用 infra 命名空間的 Gateway
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-shop-ns
+  namespace: infra          # 在「被引用」的命名空間(Gateway 所在)
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: shop-ns    # 允許 shop-ns 的 HTTPRoute 引用
+  to:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: prod-gateway
+```
+
+#### Gateway API vs Ingress 完整對照
+
+| 特性 | Ingress | Gateway API |
+|------|---------|-------------|
+| 穩定狀態 (GA) | GA(K8s 1.19) | GA(Gateway API v1.0,2023,獨立於 K8s 版本) |
+| 角色分工 | 無(全混在一個物件) | 三層分工(GatewayClass/Gateway/Route) |
+| Header 路由 | 不支援(靠 annotation) | ✅ 原生支援 |
+| 流量權重分流 | 不支援(靠 annotation) | ✅ 原生支援(weight 欄位) |
+| 跨命名空間路由 | 不支援 | ✅ 支援(透過 ReferenceGrant) |
+| gRPC | 不支援 | ✅ GRPCRoute(v1.1 穩定) |
+| TLS termination | 支援 | ✅ 支援(更細緻的設定) |
+| 可移植性 | 差(annotation 各家不同) | 好(標準 API,實作可互換) |
+| 目前採用度 | 非常廣泛(成熟生態) | 快速增長,各大實作已支援 |
+
+#### 主流實作 (Implementations)
+
+| 實作 | 說明 |
+|------|------|
+| **Cilium** | 雲原生 CNI,同時支援 Gateway API(EKS/GKE 常用) |
+| **NGINX Gateway Fabric** | NGINX 官方 Gateway API 實作 |
+| **Envoy Gateway** | CNCF 專案,以 Envoy 為底層 |
+| **Contour** | VMware 維護,以 Envoy 為底層 |
+| **Traefik** | 支援 Gateway API(v3+) |
+| **AWS Load Balancer Controller** | EKS 官方實作;v3.0.0(2026 GA)起**原生**支援 Gateway API,以 CRD 設定(L7 → ALB、L4 → NLB),不再靠 annotation |
+
+> **實務建議**:新叢集**優先評估 Gateway API**;現有叢集的 Ingress **不需要立刻遷移**(Ingress 不會被棄用),但新功能只會出現在 Gateway API 上。
+
+**動手練習(Gateway API)**:
+1. 安裝 Gateway API CRD 與一個實作(如 nginx-gateway-fabric)。
+2. 依照三層角色建立 GatewayClass → Gateway → HTTPRoute,把兩個服務路由到同一個 Gateway 的不同路徑。
+3. 用 HTTPRoute 的 `weight` 欄位做 9:1 流量分流,體驗金絲雀路由。
+4. 嘗試建立跨命名空間的 HTTPRoute + ReferenceGrant,理解為什麼需要授權。
 
 ---
 
@@ -421,6 +643,9 @@ kubectl get pods -n ingress-nginx          # Controller 在跑嗎
 - [ ] 能解釋 CoreDNS 的角色,以及「用名字耦合不用 IP 耦合」的設計價值
 - [ ] 能區分 Ingress 物件與 Ingress Controller,知道沒裝 Controller 規則不生效
 - [ ] 能寫一個依 host/path 分流並含 TLS 的 Ingress
+- [ ] 理解 Gateway API 三層角色分工(GatewayClass / Gateway / HTTPRoute),能說明它解決了 Ingress 的哪些痛點
+- [ ] 能說出 Gateway API 相較 Ingress 的三個核心優勢:Header 路由、流量權重、跨命名空間路由
+- [ ] 知道 ReferenceGrant 的用途(跨命名空間路由的授權機制)
 - [ ] 會用「先查 Endpoints、再查 DNS、再從 Pod 內實連」的順序除錯網路
 
 > 下一章:[04-config-storage.md](./04-config-storage.md) — 設定、密碼、資料怎麼跟容器解耦並持久化。

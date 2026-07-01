@@ -672,12 +672,15 @@ parameters:
 | **Managed Node Group(託管節點群組)** | AWS 幫你管 EC2 生命週期、升級流程;你選機型/數量 | 大多數情境的**首選** |
 | **Self-managed(自管節點)** | 你自己管 ASG、AMI、升級 | 需要高度客製(特殊 AMI、GPU 調校) |
 | **Fargate(無伺服器)** | **不用管任何節點**,一個 Pod 一個微型 VM | 短任務、不想管節點、安全隔離需求高 |
+| **EKS Auto Mode(全託管資料平面)** | **幾乎不管節點**:AWS 幫你管節點生命週期、OS 修補、核心外掛 | 想專注應用、不想維護基礎架構的團隊 |
 
 ```mermaid
 flowchart TB
-    EKS["EKS 控制平面"] --> MNG["Managed Node Group<br/>(AWS 協助管 EC2)"]
+    EKS["EKS 控制平面(AWS 全管)"] --> MNG["Managed Node Group<br/>(AWS 協助管 EC2)"]
     EKS --> SELF["Self-managed<br/>(你全管 ASG/AMI)"]
     EKS --> FARGATE["Fargate<br/>(無節點, 一 Pod 一 VM)"]
+    EKS --> AUTO["EKS Auto Mode<br/>(AWS 管節點+外掛+擴縮)"]
+    style AUTO fill:#c8e6c9
 ```
 
 ### 7.1 Fargate(無伺服器)
@@ -725,6 +728,118 @@ spec:
 ```
 
 > 成本觀點:**Karpenter 的 `consolidation`(整併)會主動把閒置/低使用率節點收掉**,是很有效的省錢機制。設 `limits` 上限可避免擴容失控。
+
+### 7.3 EKS Auto Mode:讓 AWS 管理整個資料平面
+
+> **源文件**:[EKS Auto Mode 官方文件](https://docs.aws.amazon.com/eks/latest/userguide/automode.html)
+
+**EKS Auto Mode** 於 2024 年 12 月 AWS re:Invent 發布並**立即 GA**。它把 EKS 的託管範圍從「控制平面」延伸到「資料平面」——節點生命週期、OS 安全更新、以及核心外掛(VPC CNI、EBS CSI、Load Balancer Controller)都交由 AWS 全程管理。
+
+本質上可以理解為:**EKS 內建 Karpenter + 自動管理所有必要外掛**,你只需要部署應用。
+
+#### 責任分工對比
+
+| 項目 | 標準 EKS | EKS Auto Mode |
+|---|---|---|
+| 控制平面(API Server / etcd) | **AWS 管** | **AWS 管** |
+| 節點佈建 (Provisioning) | 你用 MNG 或 Karpenter 管 | **AWS 自動(內建擴縮引擎)** |
+| 節點 OS 修補 / 安全更新 | 你負責輪替 | **AWS 自動輪替** |
+| VPC CNI 外掛版本升級 | 你管(Addon 手動升級) | **AWS 自動管** |
+| EBS CSI Driver 外掛 | 你安裝並升級 | **AWS 自動管** |
+| AWS Load Balancer Controller | 你安裝並管理 | **AWS 自動管** |
+| 節點整併 (Consolidation) | 需要 Karpenter 或手動 | **自動整併** |
+| 自訂 AMI / kernel 調整 | 支援 | ❌ **不支援** |
+| DaemonSet / 直接 SSH 進節點 | 支援 | ❌ 受限 |
+
+```mermaid
+flowchart LR
+    subgraph Standard["標準 EKS"]
+        direction TB
+        CP1["控制平面 (AWS 管)"]
+        DP1["資料平面 (你管)<br/>Node Group / Karpenter<br/>VPC CNI Addon<br/>EBS CSI Addon<br/>LB Controller"]
+    end
+    subgraph Auto["EKS Auto Mode"]
+        direction TB
+        CP2["控制平面 (AWS 管)"]
+        DP2["資料平面 (AWS 管)<br/>節點生命週期 + OS 更新<br/>核心外掛 + 自動整併"]
+        App2["你只需管<br/>Workload / 應用"]
+    end
+    style Standard fill:#fff3e0,stroke:#f57c00
+    style Auto fill:#e8f5e9,stroke:#388e3c
+```
+
+#### 如何啟用
+
+**方式一:eksctl 建新叢集時直接開啟**
+
+```bash
+eksctl create cluster \
+  --name my-auto-eks \
+  --region ap-northeast-1 \
+  --version 1.33 \
+  --auto-mode
+```
+
+**方式二:Config File(推薦,可版本控管)**
+
+```yaml
+# cluster-auto.yaml — EKS Auto Mode 設定檔
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: my-auto-eks
+  region: ap-northeast-1
+  version: "1.33"
+
+autoModeConfig:
+  enabled: true
+  # Auto Mode 自動管理:vpc-cni、ebs-csi-driver、
+  # aws-load-balancer-controller、kube-proxy、coredns
+```
+
+```bash
+eksctl create cluster -f cluster-auto.yaml
+
+# 驗證:Auto Mode 不會顯示傳統節點 IP,
+# 節點由 AWS 按需佈建,只有 Pod 在跑才看得到節點
+kubectl get nodes
+kubectl get pods -A
+```
+
+**方式三:對既有叢集啟用**
+
+```bash
+aws eks update-cluster-config \
+  --name my-first-eks \
+  --compute-config "enabled=true,nodePools=general-purpose,system" \
+  --kubernetes-network-config "elasticLoadBalancing={enabled=true}" \
+  --storage-config "blockStorage={enabled=true}"
+```
+
+#### 計費模式
+
+EKS Auto Mode 費用 = EC2 費用 + 節點管理費用:
+
+| 費用項目 | 計費方式 |
+|---|---|
+| EC2 On-Demand 節點 | EC2 原價 **+ 約 12% 附加費**(AWS 代管節點生命週期費) |
+| EC2 Spot 節點 | Spot 原價(附加費較低) |
+| EKS Control Plane | 同標準 EKS(約 $0.10/hr/叢集) |
+| 核心外掛(VPC CNI 等) | 不另收 Addon 費用(已含在附加費內) |
+
+> 成本判斷:**12% 的附加費換來不需要工程師手動管理 Karpenter 設定、Addon 升級、節點輪替 SOP**。對小型 / 中型團隊通常划算;對成本極度敏感且已有成熟 Karpenter 設定的大型艦隊,繼續使用標準 EKS + Karpenter 可能更省錢。
+
+#### 何時選 EKS Auto Mode
+
+| 情境 | 建議 |
+|---|---|
+| 小/中型團隊,想專注應用不想管基礎架構 | ✅ **優先選 Auto Mode** |
+| 剛上 EKS,不熟悉 Addon 管理與節點升級 | ✅ 降低入門門檻 |
+| 需要自訂 AMI(GPU driver、特殊 kernel 設定) | ❌ 選標準 EKS + 自管節點 |
+| 需要在節點安裝 DaemonSet 代理 / 直接 SSH 節點 | ❌ 選標準 EKS |
+| 嚴格合規要求直接掌控節點設定與映像 | ❌ 選標準 EKS |
+| 已有成熟 Karpenter 設定且成本極度敏感 | ⚠️ 評估 12% 溢價是否合算 |
 
 ### 動手練習 7
 
@@ -906,8 +1021,10 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我知道 StorageClass 用 `WaitForFirstConsumer` 避免跨 AZ 掛載問題。
 
 **節點 / 維運**
-- [ ] 我能比較 Managed Node Group、Self-managed、Fargate。
+- [ ] 我能比較 Managed Node Group、Self-managed、Fargate 三種運算模式。
 - [ ] 我能說出 Cluster Autoscaler 與 Karpenter 的差異。
+- [ ] 我了解 EKS Auto Mode 的定位:AWS 代管資料平面(節點 + 核心外掛),以及 ~12% 附加費的計費方式。
+- [ ] 我知道哪些情境適合 Auto Mode(小型團隊、不想管外掛),哪些不適合(自訂 AMI、DaemonSet 存取節點)。
 - [ ] 我知道升級順序是「先 control plane,再 node 與 addon」,且不能跳版。
 - [ ] 我知道 Container Insights / Control Plane Logging 會產生費用。
 
