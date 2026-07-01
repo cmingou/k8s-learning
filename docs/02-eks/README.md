@@ -468,7 +468,7 @@ kubectl set env daemonset aws-node -n kube-system \
 
 ### 4.3 Pod 專屬 Security Group (Security Group for Pods)
 
-因為 Pod 拿的是 VPC 真實 IP,EKS 支援把 **[Security Group 直接套用到特定 Pod](https://docs.aws.amazon.com/eks/latest/userguide/security-groups-for-pods.html)**,做到 Pod 等級的網路隔離(例如:只有貼了某標籤的 Pod 才能連到 RDS)。注意:此功能僅支援 Linux EC2 節點(大多數 Nitro 機型,不含 `t` 系列),**不支援 Windows 節點,也不支援 EKS Auto Mode**。
+因為 Pod 拿的是 VPC 真實 IP,EKS 支援把 **[Security Group 直接套用到特定 Pod](https://docs.aws.amazon.com/eks/latest/userguide/security-groups-for-pods.html)**,做到 Pod 等級的網路隔離(例如:只有貼了某標籤的 Pod 才能連到 RDS)。這個功能同時支援 **EC2 節點**(大多數 Nitro 機型,但不含 `t` 系列)與 **[Fargate](https://aws.amazon.com/about-aws/whats-new/2021/06/amazon-eks-pods-running-aws-fargate-support-custom-security-groups/)**;但**不支援 Windows 節點,也不支援 EKS Auto Mode**。
 
 ```yaml
 # SecurityGroupPolicy:讓符合條件的 Pod 套用指定的 Security Group
