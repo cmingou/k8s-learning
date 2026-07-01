@@ -182,6 +182,17 @@ cat /proc/$$/cgroup
 # 例如:0::/user.slice/user-1000.slice/session-3.scope
 ```
 
+> ⚠️ **`/proc/<pid>/cgroup` 給的是「巢狀路徑」,不是最上層的目錄名。** 上面的 `0::/user.slice/user-1000.slice/session-3.scope` 代表 `user.slice` **裡面**的 `user-1000.slice` **裡面**的 `session-3.scope`——你在 `/sys/fs/cgroup` 最上層只會 `ls` 到 `user.slice`(以及 `system.slice`、`init.scope`…這些子 cgroup),更深的要一層層 `cd` 進去才看得到。`0::` 是 cgroup v2 統一階層的前綴,`::` 後面那段就是相對於 `/sys/fs/cgroup` 的路徑。
+>
+> systemd 的命名慣例:**`.slice`** 是分組節點(`user.slice` 裝所有使用者、`system.slice` 裝所有系統服務)、**`user-1000.slice`** 是 UID 1000 的使用者群組、**`.scope`** 是一次登入 session 之類「外部建立的一組行程」、**`.service`** 則是服務單元。
+>
+> ```bash
+> # 一步到位:用路徑組出實際目錄,看這個 cgroup 裡有哪些行程 / 限制
+> CG=/sys/fs/cgroup$(cut -d: -f3 /proc/$$/cgroup)
+> cat "$CG/cgroup.procs"      # 應包含你的 shell PID(echo $$ 對照)
+> cat "$CG/memory.max" "$CG/cpu.max"
+> ```
+
 每個 cgroup 目錄都有幾個**核心介面檔**:
 
 | 檔案 | 作用 |
