@@ -371,7 +371,82 @@ graph LR
 4. **連結 K8s(概念題,寫下你的答案)**:
    - 為什麼同一個 Pod 裡的兩個容器,可以用 `localhost` 互相連線?(提示:命名空間)
    - 為什麼容器記憶體超標會 OOMKilled,而不是把整台機器搞掛?(提示:cgroup)
+   - 👉 完整解答與延伸(Pod / namespace / 容器的關係、cgroup OOM 原理)見下方〈**動手練習深入解答**〉。
 5. **(選做)`nsenter`**:若有 Docker,用 `docker inspect` 找出容器主行程的 PID,再用 `sudo nsenter --target <PID> --net ip addr` 看容器的網路設定。
+
+---
+
+## 動手練習深入解答
+
+### 先釐清:Pod、容器、namespace 的關係
+
+| 問題 | 答案 |
+|------|------|
+| 一個 Pod 能包含多個容器嗎? | ✅ 能。Pod 是「一組容器」的最小部署單位(常見:主容器 + sidecar,如 log agent、proxy)。 |
+| 一個 Pod 對應幾個 network namespace? | **只有一個**。Pod 內所有容器共用它,所以是同一個 Pod IP、同一個 `lo`。 |
+| 一個 network namespace 能被多個容器共用嗎? | ✅ 能。多容器 Pod 就是多個容器 `setns()` 加入「同一個」netns。 |
+| `shareProcessNamespace: true` 是誰的設定? | 是 **K8s 的 Pod spec 欄位**,但它撥動的是底層 **Linux PID namespace** 的共用與否(設 true → Pod 內容器共用同一個 PID namespace,彼此看得到行程)。 |
+
+> 🔑 心智模型:**namespace 是核心層的物件,容器只是「參照」它**。「共用」不是複製一份,而是多個容器指向同一個 namespace(同一個 inode)。所以「一個 namespace ↔ 多個容器」是天生支援的多對一。
+
+### Q1:為什麼同一個 Pod 的兩容器可以用 `localhost` 互連?
+
+因為它們**共用同一個 network namespace**——而 network namespace 隔離的是「整個網路堆疊」,包括 `lo`(127.0.0.1)與整組 port。
+
+1. Pod 建立時先起一個 **pause(sandbox)容器**,它唯一的工作就是**建立並持有這個 netns**(自己幾乎不做事,就是睡著)。
+2. 其他應用容器啟動時**不建立新 netns,而是用 `setns()` 加入 pause 的 netns**(等同 `docker run --net=container:pause`)。
+3. 於是 A、B 看到的是**同一個 `lo`、同一個 Pod IP、同一組 port**。A 監聽 `127.0.0.1:8080`,B 連 `localhost:8080` 封包走 loopback 直接就通。
+
+```mermaid
+flowchart TB
+    subgraph POD["Pod = 一個 network namespace(由 pause 持有)"]
+        PAUSE["pause 容器<br/>建立並持有 netns"]
+        CA["容器 A"]
+        CB["容器 B"]
+        NET["共用:lo 127.0.0.1<br/>+ eth0 Pod IP + 同一組 port"]
+        PAUSE --- NET
+        CA --- NET
+        CB --- NET
+    end
+    CA -.->|"localhost:8080 直接通"| CB
+```
+
+**兩個推論**:
+- 同一 Pod 內 **port 不能重複**(共用 port 空間,A 佔了 8080,B 就不能也綁 8080)。
+- 只共用 **net / IPC / UTS**;**mnt(檔案系統)與 PID 預設不共用**——所以「能 localhost 互連」≠「看得到對方行程」。要看得到對方行程,得開 `shareProcessNamespace: true`,讓它們也共用 PID namespace。
+
+### Q2:為什麼記憶體超標只砍容器、不搞垮整機?cgroup 怎麼 monitor + 限制?
+
+**關鍵一:monitor 不是輪詢,而是「分配當下就即時計費」。** 每頁記憶體都標記歸屬的 cgroup;行程一要記憶體,核心就在**分配的那一瞬間**呼叫 `try_charge()` 把用量加進 `memory.current`,並跟 `memory.max` 比。計費內建在分配路徑上,精確到頁、即時,不是背景掃描程式。
+
+**關鍵二:超標時「先回收 → 再節流 → 最後砍」,而且全都鎖在這個 cgroup 內。**
+
+```mermaid
+flowchart TB
+    ALLOC["行程要記憶體(page fault)"] --> CHARGE{"try_charge:<br/>再收一頁會超過 memory.max?"}
+    CHARGE -->|否| OK["核准,memory.current 增加"]
+    CHARGE -->|是| RECLAIM["先在此 cgroup 內回收<br/>丟乾淨 page cache / 寫回髒頁 / swap"]
+    RECLAIM -->|回收夠了| OK
+    RECLAIM -->|回收不夠<br/>匿名記憶體要不回| OOM["cgroup 專屬 OOM killer<br/>只在此 cgroup 內挑行程 SIGKILL"]
+    OOM --> RESULT["退出碼 137 → OOMKilled<br/>memory.events 的 oom_kill 增加"]
+```
+
+- **先回收 (reclaim)**:只在**這個 cgroup 內**丟乾淨 page cache、寫回髒頁、能 swap 就 swap。
+- **軟上限節流**:設了 `memory.high` 時,超過它會被施加強烈回收壓力、被拖慢,但**不殺**。
+- **回收救不了 → cgroup 專屬 OOM killer**:匿名記憶體(heap/stack)要不回來時,核心**只在這個 cgroup 內部**挑一個行程 SIGKILL。
+
+**為什麼不會拖垮整機**——爆炸半徑被鎖住:
+
+| | 觸發條件 | 挑誰砍 |
+|---|---|---|
+| 全域 OOM killer | 整機記憶體 + swap 都耗盡 | 全機任一行程(可能波及鄰居) |
+| **cgroup OOM killer** | **這個 cgroup 撞到 `memory.max`** | **只在這個 cgroup 內挑** |
+
+容器根本**還沒機會吃光整機**,就先在自己的 `memory.max` 撞牆被砍;回收與處置都限制在該 cgroup,鄰居容器與主機毫髮無傷。
+
+**對應 K8s 現象**:`limits.memory: 512Mi` → `memory.max`;撞牆 → 退出碼 **137**(128 + 9,SIGKILL)、`memory.events` 的 `oom_kill` +1、`kubectl describe pod` 顯示 **OOMKilled**;K8s 設 `memory.oom.group=1` 讓整個容器(cgroup 內全部行程)一起被砍,不留半殘狀態。
+
+> 📌 對照:**CPU 超標是「節流」不是「砍」**。`cpu.max` 超額時 CFS 排程器只讓該 cgroup 暫停到下個週期(`cpu.stat` 的 `nr_throttled` 會漲),因為 CPU 是可壓縮資源;記憶體不可壓縮、要不回只能砍——這就是「記憶體 = Kill、CPU = Throttle」的根本原因。
 
 ---
 
