@@ -21,7 +21,7 @@ kubectl get pods -n dev               # -n 指定命名空間
 kubectl config set-context --current --namespace=dev   # 設定預設命名空間,省得每次打 -n
 ```
 
-> 注意:Namespace 是**邏輯**隔離,不是網路或安全的硬牆。預設 Pod 仍可跨 Namespace 互連——要真的隔離網路得用 NetworkPolicy(第 3 章)。
+> 注意:Namespace 是**邏輯**隔離,不是網路或安全的硬牆。預設 Pod 仍可跨 Namespace 互連([沒有 NetworkPolicy 時,Pod 對 ingress/egress 都是「非隔離」狀態,允許所有連線](https://kubernetes.io/docs/concepts/services-networking/network-policies/#the-two-sorts-of-pod-isolation))——要真的隔離網路得用 NetworkPolicy(第 3 章)。
 
 ---
 
@@ -65,7 +65,7 @@ spec:
       image: my-app:1.0
 ```
 
-> 安全建議:**不要讓應用 Pod 用 default SA 並給它過大權限。** 為需要呼叫 API 的應用建專屬 SA,只授予剛好夠用的權限(最小權限原則)。不需要呼叫 API 的 Pod,可關掉自動掛 token(`automountServiceAccountToken: false`)。
+> 安全建議:**不要讓應用 Pod 用 default SA 並給它過大權限。** 為需要呼叫 API 的應用建專屬 SA,只授予剛好夠用的權限(最小權限原則)。不需要呼叫 API 的 Pod,可關掉自動掛 token(`automountServiceAccountToken: false`)——這是[官方 RBAC Good Practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation-permission)明確建議的加固手法。
 
 ---
 
@@ -167,7 +167,7 @@ K8s 依 requests/limits 設定把 Pod 分成三級,**節點記憶體不足要驅
 | **Burstable** | 有設 requests,但不滿足 Guaranteed | 中間 |
 | **BestEffort** | 完全沒設 requests/limits | 最先被驅逐(最不穩) |
 
-> 重要服務想要最穩,就把 requests 設成等於 limits,進入 Guaranteed 等級。
+> 重要服務想要最穩,就把 requests 設成等於 limits,進入 Guaranteed 等級。三個等級的判定條件與驅逐順序見[官方文件 Pod Quality of Service Classes](https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/)。
 
 ### 5.2 用配額管住整個 Namespace
 
@@ -212,6 +212,8 @@ spec:
 | **livenessProbe**(存活) | 還活著嗎? | **重啟容器** | 偵測死鎖/卡死,救回卡住的程式 |
 | **readinessProbe**(就緒) | 能接流量了嗎? | **從 Service Endpoints 移除**(不殺) | 暫時不可用時先停止導流(回想第 3 章) |
 | **startupProbe**(啟動) | 啟動完成了嗎? | 重啟容器 | 給慢啟動的程式緩衝,期間不跑 liveness |
+
+> 三種探針的語意與失敗行為見[官方文件 Container Probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#types-of-probe)。
 
 ```yaml
 spec:
@@ -276,7 +278,7 @@ kubectl top pods                 # 確認能看到 CPU/記憶體用量(代表 me
 kubectl get hpa -w               # 觀察副本數隨負載變化
 ```
 
-> **前提**:HPA 的 CPU 百分比是相對於 **requests** 算的,所以**容器一定要設 requests**,否則 HPA 算不出使用率。這把第 5 節與這節串起來了。
+> **前提**:HPA 的 CPU 百分比是相對於 **requests** 算的,所以**容器一定要設 requests**,否則該 Pod 的 CPU 使用率「未定義」,HPA 不會針對這個指標採取任何擴縮動作(見[官方文件](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#algorithm-details))。這把第 5 節與這節串起來了。
 >
 > 補充:HPA 改「Pod 數量」(水平);VPA 改「單一 Pod 的 requests/limits」(垂直);Cluster Autoscaler 改「節點數量」。三者解決不同層級。
 
@@ -322,6 +324,86 @@ kubectl describe pod my-pod | grep -A5 "Requests:"
 ```
 
 📖 **官方文件**:[Resize CPU and Memory Resources assigned to Containers](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/)
+
+---
+
+## 7.2 PodDisruptionBudget(PDB):主動中斷保護
+
+> 官方文件:[Disruptions | Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/)
+
+HPA 管「要開幾個 Pod」;**PDB 管「升級/縮容時至少要保留幾個 Pod 不被打斷」**。兩者互補,共同構成高可用防線。
+
+#### 主動中斷 vs 非主動中斷
+
+Kubernetes 把節點下線事件分成兩類:
+
+| 類型 | 範例 | PDB 能保護嗎? |
+|------|------|--------------|
+| **非主動中斷 (Involuntary Disruption)** | 硬體故障、OOM kill、節點被意外刪除 | **無法**保護(硬體壞了 PDB 擋不住) |
+| **主動中斷 (Voluntary Disruption)** | `kubectl drain`、節點升級、Cluster Autoscaler / Karpenter 縮容 | **能保護**:執行者會尊重 PDB 再決定是否繼續 |
+
+PDB 守住的是**主動中斷**那條線——在維護、升級、自動縮容時,確保存活的 Pod 數不低於你設的門檻。
+
+#### 建立 PDB
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-pdb
+spec:
+  selector:
+    matchLabels:
+      app: web              # 對應到 Deployment 的 Pod label
+  minAvailable: 2           # 無論如何,至少要有 2 個 Pod 在健康狀態
+  # 也可以用:
+  # maxUnavailable: 1       # 一次最多允許 1 個 Pod 中斷(與 minAvailable 二選一)
+```
+
+兩個參數的選擇:
+
+| 參數 | 語意 | 適合場景 |
+|------|------|----------|
+| `minAvailable: 2` | 存活 Pod 不能少於 2 個 | 有絕對最低服務人數的場景 |
+| `minAvailable: "50%"` | 存活 Pod 不能少於當前副本數的 50% | 副本數隨 HPA 變動,百分比更彈性 |
+| `maxUnavailable: 1` | 一次最多允許 1 個 Pod 同時不可用 | 想直接控制中斷速度 |
+
+#### kubectl drain 如何與 PDB 互動
+
+```bash
+# 節點維護前:標記不可排程並驅逐所有 Pod
+kubectl drain worker-1 --ignore-daemonsets --delete-emptydir-data
+```
+
+```mermaid
+flowchart LR
+    DRAIN["kubectl drain<br/>worker-1"] --> CHECK{"PDB<br/>允許驅逐?"}
+    CHECK -->|"允許:驅逐後存活副本仍 ≥ minAvailable"| EVICT["驅逐 Pod<br/>(Kubernetes 發 Eviction API)"]
+    CHECK -->|"不允許:副本數已到底線"| WAIT["暫停等待...<br/>直到其他副本 Ready"]
+    WAIT --> CHECK
+    EVICT --> DONE["節點清空完成"]
+```
+
+```bash
+# 查看 PDB 狀態
+kubectl get pdb
+# NAME      MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+# web-pdb   2               N/A               1                     5m
+
+# ALLOWED DISRUPTIONS = 目前健康 Pod 數 − minAvailable
+# 為 0 時,drain / 縮容會卡住等待
+```
+
+#### PDB 與 HPA 的組合技與注意事項
+
+```yaml
+# 正確組合範例:
+# HPA:  minReplicas: 3, maxReplicas: 10
+# PDB:  minAvailable: 2  (或 maxUnavailable: 1)
+# 效果:流量低時 HPA 最少維持 3 個,縮容/維護時 PDB 保底 2 個不被同時打斷
+```
+
+> 注意:`minAvailable` 的值**必須小於 HPA 的 `minReplicas`**(若設成等於或大於,`ALLOWED DISRUPTIONS` 會是 0),否則 Cluster Autoscaler 或 Karpenter 縮容時永遠無法驅逐 Pod,導致節點無法清空的死鎖——叢集升級會卡住。
 
 ---
 
@@ -430,7 +512,7 @@ spec:
 **經典用途**:
 
 - **專用節點**:給 GPU 節點打汙點,只有需要 GPU 且帶對應容忍的 Pod 能上去,一般 Pod 不會浪費這些昂貴節點。
-- **控制平面節點**:control-plane 節點預設帶汙點 `node-role.kubernetes.io/control-plane:NoSchedule`,所以你的應用 Pod 不會被排到大腦上。DaemonSet(第 2 章)若要連 control-plane 也跑,就得加容忍。
+- **控制平面節點**:`kubeadm` 建立的 control-plane 節點預設帶汙點 `node-role.kubernetes.io/control-plane:NoSchedule`,所以你的應用 Pod 不會被排到大腦上(見[官方文件 Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/))。DaemonSet(第 2 章)若要連 control-plane 也跑,就得加容忍。
 
 ### Affinity 與 Taint/Toleration 對照
 
@@ -471,6 +553,7 @@ spec:
 - [ ] 能說出 Guaranteed / Burstable / BestEffort 三種 QoS 與驅逐優先序
 - [ ] 能正確配置 liveness / readiness / startup 三種探針並說明失敗後行為差異
 - [ ] 能設定 HPA 並理解它依賴 metrics-server 與容器的 requests
+- [ ] 能建立 PodDisruptionBudget(PDB),說明 minAvailable / maxUnavailable 的差異,以及它如何讓 kubectl drain 不中斷服務
 - [ ] 能用 nodeSelector / nodeAffinity / podAntiAffinity 控制 Pod 落點
 - [ ] 能解釋汙點與容忍的方向(節點排斥 Pod),三種 effect 的差異,以及與 affinity 的搭配
 - [ ] 理解「容忍只是允許、不保證會去」,需搭配 affinity 才能真正吸引 Pod

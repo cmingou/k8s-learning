@@ -45,7 +45,7 @@
 
 | 項目 | EKS (AWS) | GKE (Google) | AKS (Azure) |
 |---|---|---|---|
-| Control Plane 收費 | **按小時收費**(約 $0.10/hr,標準支援) | Autopilot/Standard 各有計價,有一個免費叢集額度 | 標準層免費,進階 SLA 收費 |
+| Control Plane 收費 | **按小時收費**([標準支援 (Standard Support) $0.10/hr;過了 14 個月後自動進入延伸支援 (Extended Support),漲到 $0.60/hr](https://aws.amazon.com/eks/pricing/)) | Autopilot/Standard 各有計價,有一個免費叢集額度 | 標準層免費,進階 SLA 收費 |
 | 預設體驗 | 偏「組裝」,彈性高、要自己接很多東西 | 偏「開箱即用」,自動化程度公認最高 | 介於兩者之間 |
 | 與雲整合 | IAM、VPC、ALB/NLB、EBS/EFS… | IAM、VPC、Cloud LB… | Entra ID、VNet… |
 
@@ -87,7 +87,7 @@ flowchart TB
 
 ## 2. 建立第一個叢集
 
-建立 EKS 叢集主流有三種方式:**eksctl**(最快上手)、**Terraform**(IaC、團隊正式環境推薦)、**AWS Console / CLI**(手動,不建議生產用)。本章以 eksctl 入門,並簡述 Terraform。
+建立 EKS 叢集主流有三種方式:**[eksctl](https://docs.aws.amazon.com/eks/latest/userguide/getting-started-eksctl.html)**(最快上手,AWS 官方推薦的 CLI 建立工具)、**Terraform**(IaC、團隊正式環境推薦)、**AWS Console / CLI**(手動,不建議生產用)。本章以 eksctl 入門,並簡述 Terraform。
 
 ### 2.1 前置準備
 
@@ -116,13 +116,15 @@ kubectl version --client
 eksctl create cluster \
   --name my-first-eks \           # 叢集名稱
   --region ap-northeast-1 \       # 東京區(離台灣近、延遲低)
-  --version 1.30 \                # K8s 版本
+  --version 1.34 \                # K8s 版本(請以官方「目前標準支援版本」清單為準,見下方說明)
   --nodegroup-name ng-default \   # 節點群組名稱
   --node-type t3.medium \         # 節點機型(練習用小一點,省錢)
   --nodes 2 \                     # 想要的節點數
   --nodes-min 1 --nodes-max 3 \   # 自動擴縮的上下限
   --managed                       # 使用 Managed Node Group(推薦)
 ```
+
+> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,之後預設自動進入 **12 個月延伸支援 (Extended Support,需額外付費)**,總計 26 個月生命週期。目前(2026 年中)標準支援版本約落在 `1.33` ~ `1.36` 區間,建議建立新叢集前先用 `aws eks describe-cluster-versions` 查當下的標準支援清單,而不要照抄教材裡的版本號。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
 
 > 這個指令通常要跑 **15~20 分鐘**(它在背後用 CloudFormation 建一堆資源)。完成後 eksctl 會自動幫你寫好 `~/.kube/config`。
 
@@ -136,7 +138,7 @@ kind: ClusterConfig
 metadata:
   name: my-first-eks
   region: ap-northeast-1
-  version: "1.30"
+  version: "1.34"   # 建立前請查當下標準支援版本清單(見上方說明)
 
 # 啟用 OIDC(IRSA 一定需要,後面第 3 章會用到)
 iam:
@@ -177,7 +179,7 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = "my-first-eks"
-  cluster_version = "1.30"
+  cluster_version = "1.34"   # 建立前請查當下標準支援版本清單
 
   vpc_id     = module.vpc.vpc_id                 # 來自 vpc module
   subnet_ids = module.vpc.private_subnets
@@ -271,7 +273,7 @@ data:
 
 **新做法(推薦):Access Entries + Access Policies**
 
-AWS 後來推出 **存取項目 (Access Entries)**,直接用 AWS API / Console 管理「IAM 身份 → K8s 權限」的對應,不再需要手改 ConfigMap:
+AWS 後來推出 **[存取項目 (Access Entries)](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html)**,直接用 AWS API / Console 管理「IAM 身份 → K8s 權限」的對應,不再需要手改 ConfigMap。目前 `aws-auth` ConfigMap 已被官方文件列為**舊式做法 (legacy)**,新叢集建議直接把驗證模式 (Authentication Mode) 設為 `API`,完全改用 Access Entries:
 
 ```bash
 # 用 Access Entry 把一個 IAM 角色加入叢集,並賦予叢集管理員權限
@@ -293,17 +295,17 @@ aws eks associate-access-policy \
 | 稽核 | 弱 | 有 IAM/CloudTrail 紀錄 |
 | 預設政策 | 無 | 有 ClusterAdmin / Admin / View 等內建政策 |
 
-### 3.2 方向二:Pod 如何取得 AWS 權限(IRSA)
+### 3.2 方向二:Pod 如何取得 AWS 權限(IRSA 與 Pod Identity)
 
-這是面試與實戰都超高頻的主題。
+這是面試與實戰都超高頻的主題。EKS 目前提供**兩種**官方做法來讓 Pod 取得 AWS 權限:**[IRSA (IAM Roles for Service Accounts)](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)** 與較新的 **[EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html)**。官方文件目前已明確建議:「**只要可行,優先使用 EKS Pod Identity 來授權 Pod 存取 AWS 資源**」([Granting IAM permissions to workloads](https://docs.aws.amazon.com/eks/latest/userguide/service-accounts.html#service-accounts-iam-compare))。本節先講共通原理(以 IRSA 為例,因為它的 OIDC 機制最能說明底層邏輯),3.3 節再講 Pod Identity 的差異與目前的選用建議。
 
 **問題情境**:你有個 Pod 要去讀 S3。怎麼給它 AWS 權限?
 
 - ❌ **錯誤做法**:把 AWS Access Key 寫在環境變數 / Secret 裡。金鑰會外洩、不會輪替、權限太大。
 - ❌ **次佳做法**:用節點的 IAM 角色 (Instance Profile)。問題是**同一節點上所有 Pod 共用同一組權限**,違反最小權限原則。
-- ✅ **正解:IRSA (IAM Roles for Service Accounts)**。讓「**每一個 ServiceAccount**」對應到「**一個 IAM 角色**」,Pod 用這個 SA 就只拿到它該有的權限。
+- ✅ **正解:讓「每一個 ServiceAccount」對應到「一個 IAM 角色」**,Pod 用這個 SA 就只拿到它該有的權限。傳統做法是 **IRSA**,新做法是 **Pod Identity**(見 3.3)。
 
-**原理:OIDC + ServiceAccount Token**
+**原理:OIDC + ServiceAccount Token**(詳見官方〈[IAM roles for service accounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)〉)
 
 1. EKS 叢集會有一個 **OIDC 提供者 (OIDC Provider)** 的 URL。
 2. 你在 IAM 建立一個角色,它的「信任政策 (Trust Policy)」寫明:**「我信任這個叢集的 OIDC,而且只信任 `namespace:serviceaccount` 是某某的請求」**。
@@ -374,15 +376,15 @@ spec:
 kubectl exec -it test-s3 -- aws s3 ls
 ```
 
-### 3.3 EKS Pod Identity(更新、更簡單的做法)
+### 3.3 EKS Pod Identity(目前官方建議的預設做法)
 
-AWS 後來又推出 **EKS Pod Identity**,目標是把 IRSA 弄得更簡單。差異在於:
+AWS 在 2023 年底推出 **[EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html)**,目標是把 IRSA 弄得更簡單。差異在於:
 
-- **IRSA**:每個叢集要設一個 OIDC 提供者;IAM 角色信任政策綁定該叢集的 OIDC。跨叢集要重設。
-- **Pod Identity**:裝一個 **Pod Identity Agent 外掛**,用一條 `CreatePodIdentityAssociation` 把「叢集 + namespace + SA」對應到「IAM 角色」,**不需要管 OIDC**,且同一個角色可重複用在多個叢集。
+- **IRSA**:每個叢集要設一個 OIDC 提供者;IAM 角色信任政策要綁定該叢集專屬的 OIDC issuer URL,**換一個叢集就要重新改一次信任政策**。
+- **Pod Identity**:裝一個 **Pod Identity Agent 外掛**(`eks-pod-identity-agent`),用 `CreatePodIdentityAssociation` 把「叢集 + namespace + SA」對應到「IAM 角色」。IAM 角色只需信任統一的服務主體 `pods.eks.amazonaws.com`,**不需要管 OIDC**,同一個角色可以重複用在多個叢集而不必修改信任政策,還原生支援以 session tag 做 ABAC。
 
 ```bash
-# 1. 安裝 Pod Identity Agent 外掛
+# 1. 安裝 Pod Identity Agent 外掛(EKS Auto Mode 叢集不需要這步,已內建)
 eksctl create addon --name eks-pod-identity-agent --cluster my-first-eks
 
 # 2. 建立關聯(把 namespace/SA 綁到一個 IAM 角色)
@@ -393,14 +395,18 @@ aws eks create-pod-identity-association \
   --role-arn arn:aws:iam::111122223333:role/my-s3-role
 ```
 
+> eksctl 也提供整合指令 `eksctl create podidentityassociation`,可一次建好 IAM 角色、信任政策與關聯,用法類似 `eksctl create iamserviceaccount`。詳見 [eksctl 官方文件](https://docs.aws.amazon.com/eks/latest/eksctl/pod-identity-associations.html)。
+
 | 比較 | IRSA | Pod Identity |
 |---|---|---|
 | 是否需要 OIDC | 需要(每叢集一個) | 不需要 |
-| 信任政策複雜度 | 較複雜(綁 OIDC + SA) | 較簡單(統一信任 EKS 服務) |
-| 跨叢集重用角色 | 不易 | 容易 |
-| 推出時間 | 較早、生態成熟 | 較新,逐漸成為推薦 |
+| 信任政策複雜度 | 較複雜(綁 OIDC + SA,且每叢集要改) | 較簡單(統一信任 `pods.eks.amazonaws.com`) |
+| 跨叢集重用角色 | 不易(信任政策長度也限制約 4~8 條信任關係) | 容易,免改信任政策 |
+| 支援環境 | EKS、EKS Anywhere、self-managed K8s on EC2、ROSA | **僅限 Amazon EKS**(且僅 Linux EC2 節點,Fargate 與 Windows 節點不支援) |
+| ABAC(依 tag 控權限) | 不支援 | 支援(內建 session tag:叢集名稱、namespace、SA) |
+| 推出時間 | 2019 年,生態成熟 | 2023 年底推出,**官方目前建議優先使用** |
 
-> 實務建議:新叢集若工具鏈支援,優先評估 **Pod Identity**;但 IRSA 仍最廣泛、相容性最好,務必兩者都理解原理。
+> **官方建議**:AWS 官方文件明確指出「[只要可行,建議優先用 EKS Pod Identity 授權 Pod 存取 AWS 資源](https://docs.aws.amazon.com/eks/latest/userguide/service-accounts.html#service-accounts-iam-compare)」。但要注意 **Fargate 與 Windows 節點目前不支援 Pod Identity**,這些情境仍須使用 IRSA;混用兩者(例如 EC2 節點用 Pod Identity、Fargate 用 IRSA)在同一叢集內是完全支援的做法。新專案建議:EC2 節點優先用 Pod Identity,Fargate 或既有舊叢集才繼續用 IRSA。
 
 ### 動手練習 3
 
@@ -415,7 +421,7 @@ aws eks create-pod-identity-association \
 
 ### 4.1 VPC CNI 外掛的原理
 
-EKS 預設使用 **Amazon VPC CNI** 外掛(那個跑在每個節點上的 `aws-node` DaemonSet)。它最大的特色是:
+EKS 預設使用 **[Amazon VPC CNI](https://docs.aws.amazon.com/eks/latest/userguide/managing-vpc-cni.html)** 外掛(那個跑在每個節點上的 `aws-node` DaemonSet)。它最大的特色是:
 
 > **每個 Pod 直接拿一個「VPC 內的真實 IP」**,而不是像 Flannel/Calico Overlay 那樣另外包一層虛擬網路。
 
@@ -449,7 +455,7 @@ VPC CNI 的代價是:**Pod 會吃掉 VPC 子網路的 IP**。常見踩雷:
 | 手段 | 說明 |
 |---|---|
 | 子網路給大一點 | 規劃時就用大 CIDR(例如 `/19`、`/18`)避免之後痛苦 |
-| Prefix Delegation | 開啟後一張 ENI 一次配發一段 `/28` 前綴,大幅提高單節點 Pod 密度 |
+| [Prefix Delegation](https://docs.aws.amazon.com/eks/latest/userguide/cni-increase-ip-addresses.html) | 開啟後一張 ENI 一次配發一段 IP 前綴(IPv4 為 `/28`),大幅提高單節點 Pod 密度、減少 EC2 API 呼叫 |
 | 自訂網路 (Custom Networking) | 把 Pod IP 放到另一段次要 CIDR,節省主子網路 IP |
 
 ```bash
@@ -462,7 +468,7 @@ kubectl set env daemonset aws-node -n kube-system \
 
 ### 4.3 Pod 專屬 Security Group (Security Group for Pods)
 
-因為 Pod 拿的是 VPC 真實 IP,EKS 支援把 **Security Group 直接套用到特定 Pod**,做到 Pod 等級的網路隔離(例如:只有貼了某標籤的 Pod 才能連到 RDS)。
+因為 Pod 拿的是 VPC 真實 IP,EKS 支援把 **[Security Group 直接套用到特定 Pod](https://docs.aws.amazon.com/eks/latest/userguide/security-groups-for-pods.html)**,做到 Pod 等級的網路隔離(例如:只有貼了某標籤的 Pod 才能連到 RDS)。注意:此功能僅支援 Linux EC2 節點(大多數 Nitro 機型,不含 `t` 系列),**不支援 Windows 節點,也不支援 EKS Auto Mode**。
 
 ```yaml
 # SecurityGroupPolicy:讓符合條件的 Pod 套用指定的 Security Group
@@ -491,7 +497,7 @@ spec:
 
 ## 5. 負載平衡與 Ingress
 
-EKS 上對外暴露服務,核心是 **AWS Load Balancer Controller**(AWS 官方控制器,要自己裝)。它監看 K8s 的 Service 與 Ingress 資源,自動去 AWS 建立對應的負載平衡器。
+EKS 上對外暴露服務,核心是 **[AWS Load Balancer Controller](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html)**(AWS 官方控制器,標準模式下要自己裝;EKS Auto Mode 已內建,不需另外安裝)。它監看 K8s 的 Service 與 Ingress 資源,自動去 AWS 建立對應的負載平衡器。若不裝這個 controller,K8s 會退回用舊版「legacy cloud provider」建立 Classic Load Balancer,官方不建議使用。
 
 ### 5.1 三種對應關係
 
@@ -592,24 +598,27 @@ K8s 的 PersistentVolume (PV) 在 EKS 上要靠 **CSI Driver (Container Storage 
 
 | Driver | 對應 AWS 服務 | 特性 | 適用 |
 |---|---|---|---|
-| **EBS CSI Driver** | EBS 區塊儲存 | 單一 AZ、**ReadWriteOnce**(一次一個節點掛載) | 資料庫、需要區塊裝置的應用 |
-| **EFS CSI Driver** | EFS 網路檔案系統 | 跨 AZ、**ReadWriteMany**(多 Pod 共享) | 共享檔案、多副本讀寫同一份資料 |
+| **[EBS CSI Driver](https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html)** | EBS 區塊儲存 | 單一 AZ、**ReadWriteOnce**(一次一個節點掛載);**無法掛載到 Fargate Pod** | 資料庫、需要區塊裝置的應用 |
+| **[EFS CSI Driver](https://docs.aws.amazon.com/eks/latest/userguide/efs-csi.html)** | EFS 網路檔案系統 | 跨 AZ、**ReadWriteMany**(多 Pod 共享) | 共享檔案、多副本讀寫同一份資料 |
 
 > 關鍵差異:**EBS 不能跨 AZ**。如果 Pod 因為排程跑到別的 AZ,它就掛不到原本那顆 EBS。EFS 沒這問題,但它是檔案系統、不是區塊裝置。
 
 ### 6.1 安裝 EBS CSI Driver(用 EKS Addon)
 
 ```bash
-# 1. 給 driver 用的 IRSA 角色(它要有建立/掛載 EBS 的權限)
+# 1. 給 driver 用的 IAM 角色(它要有建立/掛載 EBS 的權限)
+#    官方目前建議優先用 Pod Identity 設定此權限(見第 3.3 節);以下示範仍以 IRSA 寫法為例
 eksctl create iamserviceaccount \
   --cluster my-first-eks --namespace kube-system \
   --name ebs-csi-controller-sa \
   --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
   --approve
 
-# 2. 以 EKS Addon 方式安裝(由 AWS 託管、好升級)
+# 2. 以 EKS Addon 方式安裝(由 AWS 託管、好升級;EKS Auto Mode 叢集不需要這步,已內建)
 eksctl create addon --name aws-ebs-csi-driver --cluster my-first-eks
 ```
+
+> 官方文件建議透過 [EKS Addon 安裝 EBS CSI Driver](https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html) 以簡化升級與安全性管理;若是新建立的角色,也可考慮改用更新、權限範圍更收斂的 `AmazonEBSCSIDriverPolicyV2` 受管政策。
 
 ### 6.2 StorageClass 與 PVC
 
@@ -665,7 +674,7 @@ parameters:
 
 ## 7. 節點管理
 
-工作節點 (Worker Node) 是你自己的責任。EKS 提供三種運算模式:
+工作節點 (Worker Node) 是你自己的責任(EKS Auto Mode 例外,見 7.3)。EKS 提供四種運算模式:
 
 | 模式 | 你管什麼 | 適合 |
 |---|---|---|
@@ -695,18 +704,18 @@ eksctl create fargateprofile \
   --namespace default
 ```
 
-> Fargate 取捨:省去管節點、隔離性好,但**不能用 DaemonSet、不能掛 EBS、每 Pod 啟動較慢、單價通常較高**。適合事件型/批次型工作負載。
+> [Fargate 取捨](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html):省去管節點、隔離性好,但**不支援 DaemonSet、不能掛 Amazon EBS(只能掛 EFS)、不支援 Fargate Spot、不支援特權容器與 GPU、每 Pod 啟動較慢、單價通常較高**。適合事件型/批次型工作負載。
 
 ### 7.2 自動擴縮:Cluster Autoscaler vs Karpenter
 
-當 Pod 因為「沒有節點可排」而卡在 Pending,需要自動加節點。兩種主流方案:
+當 Pod 因為「沒有節點可排」而卡在 Pending,需要自動加節點。若沒用 EKS Auto Mode(7.3 節,它內建 Karpenter 自動處理),兩種主流自管方案是:
 
-| 項目 | Cluster Autoscaler (CA) | Karpenter |
+| 項目 | Cluster Autoscaler (CA) | [Karpenter](https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html) |
 |---|---|---|
 | 運作方式 | 調整既有 **Node Group / ASG** 的數量 | **直接、即時**幫你挑機型、開 EC2,不綁固定 Node Group |
 | 機型彈性 | 受限於你預先定義的 Node Group 機型 | 自動從眾多機型挑最划算的(含 Spot) |
 | 擴容速度 | 較慢(走 ASG) | 較快、更省成本 |
-| 複雜度 | 成熟、單純 | 較新、設定彈性大,AWS 力推 |
+| 複雜度 | 成熟、單純 | API 已於 v1 版(`karpenter.sh/v1`)穩定為 GA,AWS 官方建議的擴縮方案 |
 
 ```yaml
 # Karpenter NodePool 範例(節錄):讓它自動挑便宜機型、優先用 Spot
@@ -736,6 +745,8 @@ spec:
 **EKS Auto Mode** 於 2024 年 12 月 AWS re:Invent 發布並**立即 GA**。它把 EKS 的託管範圍從「控制平面」延伸到「資料平面」——節點生命週期、OS 安全更新、以及核心外掛(VPC CNI、EBS CSI、Load Balancer Controller)都交由 AWS 全程管理。
 
 本質上可以理解為:**EKS 內建 Karpenter + 自動管理所有必要外掛**,你只需要部署應用。
+
+> **節點的安全與生命週期預設值**:Auto Mode 節點用的是強化過的 [Bottlerocket](https://aws.amazon.com/bottlerocket) AMI(**唯讀根檔案系統、SELinux 強制模式、禁止 SSH/SSM 直連**),而且**每個節點最長存活 21 天**就會被自動汰換成新節點,確保 OS 與元件保持最新。這也是為什麼下表「不支援自訂 AMI / 直接 SSH」——節點被刻意設計成不可變 (immutable)。
 
 #### 責任分工對比
 
@@ -841,6 +852,18 @@ EKS Auto Mode 費用 = EC2 費用 + 節點管理費用:
 | 嚴格合規要求直接掌控節點設定與映像 | ❌ 選標準 EKS |
 | 已有成熟 Karpenter 設定且成本極度敏感 | ⚠️ 評估 12% 溢價是否合算 |
 
+### 7.4 Managed Node Group 的 AMI 選擇:AL2023 已取代 AL2
+
+若用 Managed Node Group / Self-managed 節點(非 Auto Mode),節點作業系統 (AMI) 目前主要有三種選擇:
+
+| AMI 類型 | 說明 |
+|---|---|
+| **[Amazon Linux 2023 (AL2023)](https://docs.aws.amazon.com/eks/latest/userguide/eks-optimized-ami.html)** | **目前的預設值**:1.30 以後新建的 Managed Node Group 自動使用 AL2023;比 AL2 更安全(預設啟用 IMDSv2、SELinux permissive 模式) |
+| Amazon Linux 2 (AL2) | **舊版,已停止發布新 AMI**:EKS 已於 2025 年 11 月起停止發布新的 AL2 最佳化 AMI,`1.32` 是最後支援 AL2 的版本,`1.33` 以後僅提供 AL2023 / Bottlerocket |
+| **Bottlerocket** | AWS 開發的容器專用最小化作業系統,攻擊面更小,EKS Auto Mode 節點即使用 Bottlerocket 變體 |
+
+> 若你的既有 node group 還在用 AL2,建議規劃遷移到 AL2023;若叢集未來要升到 `1.33` 以上,AL2 將不再有官方 AMI 可用。詳見官方〈[Guide to EKS AL2 & AL2-Accelerated AMIs transition](https://docs.aws.amazon.com/eks/latest/userguide/eks-ami-deprecation-faqs.html)〉。
+
 ### 動手練習 7
 
 1. 用 `eksctl create nodegroup` 額外加一個 Spot 機型的 Node Group,觀察 Spot 與 On-Demand 的價差。
@@ -856,8 +879,8 @@ EKS Auto Mode 費用 = EC2 費用 + 節點管理費用:
 
 | 工具 | 用途 |
 |---|---|
-| **Control Plane Logging** | 把 API Server / audit / authenticator 日誌送 CloudWatch(會收費) |
-| **CloudWatch Container Insights** | 收集節點/Pod 的 CPU、記憶體、網路等指標與日誌 |
+| **[Control Plane Logging](https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html)** | 把 API Server / audit / authenticator / controllerManager / scheduler 等日誌送 CloudWatch(預設關閉,開啟會收費) |
+| **[CloudWatch Container Insights](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ContainerInsights.html)** | 收集節點/Pod 的 CPU、記憶體、網路等指標與日誌 |
 | **CloudWatch / 自架 Prometheus + Grafana** | 指標監控(自架更彈性,Container Insights 較省事) |
 
 ```bash
@@ -869,17 +892,17 @@ eksctl create addon --name amazon-cloudwatch-observability --cluster my-first-ek
 
 ### 8.2 升級策略 (Upgrade Strategy)
 
-EKS 升級分兩步,**順序很重要**:
+EKS 升級分兩步,**順序很重要**(詳見官方〈[Update existing cluster to new Kubernetes version](https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html)〉):
 
-1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version 1.31 --approve`(一次只能升一個小版本,例如 1.30 → 1.31,不能跳版)。
+1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.33 → 1.34,不能跳版;且**控制平面無法降版**,降版只能整個重建叢集)。
 2. **再升 Node Group / 外掛**:讓節點的 kubelet 版本追上,並升級 VPC CNI、CoreDNS、kube-proxy 等 Addon。
 
 ```bash
-# 升級控制平面(一次升一個 minor 版本)
-eksctl upgrade cluster --name my-first-eks --version 1.31 --approve
+# 升級控制平面(一次升一個 minor 版本;版本號請以官方目前標準支援清單為準)
+eksctl upgrade cluster --name my-first-eks --version 1.34 --approve
 
 # 升級託管節點群組(會以滾動方式替換節點)
-eksctl upgrade nodegroup --cluster my-first-eks --name ng-default --kubernetes-version 1.31
+eksctl upgrade nodegroup --cluster my-first-eks --name ng-default --kubernetes-version 1.34
 
 # 升級核心 Addon
 eksctl update addon --name vpc-cni --cluster my-first-eks
@@ -887,7 +910,7 @@ eksctl update addon --name coredns --cluster my-first-eks
 eksctl update addon --name kube-proxy --cluster my-first-eks
 ```
 
-> 與自建 K8s 的差異:控制平面升級在 EKS 是「按一下」,但**節點升級、外掛相容性、API 棄用 (Deprecated API) 檢查仍是你的責任**。升級前務必看 K8s 版本的 deprecation 公告,並用 `kubectl` 確認沒有用到被移除的 API。
+> 與自建 K8s 的差異:控制平面升級在 EKS 是「按一下」,但**節點升級、外掛相容性、API 棄用 (Deprecated API) 檢查仍是你的責任**。升級前務必看 K8s 版本的 deprecation 公告,並用 `kubectl` 確認沒有用到被移除的 API;官方也提供 [EKS Upgrade Insights](https://docs.aws.amazon.com/eks/latest/userguide/cluster-insights.html) 自動掃描叢集是否用到即將棄用的 API。若用 EKS Auto Mode,節點會在控制平面升級後自動分批更新,但仍需手動升級控制平面本身。
 
 ### 動手練習 8
 
@@ -906,7 +929,7 @@ eksctl update addon --name kube-proxy --cluster my-first-eks
 
 | 資源 | 計費方式 | 備註 |
 |---|---|---|
-| **EKS Control Plane** | **按小時**(約 $0.10/hr/叢集) | 叢集一存在就扣,跟你用不用無關 |
+| **[EKS Control Plane](https://aws.amazon.com/eks/pricing/)** | **按小時**(標準支援 $0.10/hr/叢集;延伸支援 $0.60/hr/叢集) | 叢集一存在就扣,跟你用不用無關;版本進入延伸支援後費用會跳漲 |
 | **Worker Node (EC2)** | 按 EC2 機型小時 + EBS | 節點越多越貴;Spot 較便宜 |
 | **Fargate** | 按 Pod 的 vCPU/記憶體 | 跑越久越貴 |
 | **ALB / NLB** | 每個 LB 按小時 + 流量 (LCU) | Ingress/Service 殘留會讓 LB 殘留 |
@@ -1007,7 +1030,7 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我能解釋 IRSA 的原理:OIDC + ServiceAccount Token + AssumeRoleWithWebIdentity。
 - [ ] 我知道為什麼不該把 AWS Access Key 塞進 Pod。
 - [ ] 我了解 Access Entries 比 aws-auth ConfigMap 安全在哪裡。
-- [ ] 我了解 Pod Identity 與 IRSA 的差異(是否需要 OIDC)。
+- [ ] 我了解 Pod Identity 與 IRSA 的差異(是否需要 OIDC),也知道目前官方建議新工作負載優先用 Pod Identity,但 Fargate/Windows 節點仍須用 IRSA。
 
 **網路**
 - [ ] 我能解釋 VPC CNI 讓 Pod 直接拿 VPC IP 的原理與好處。
@@ -1021,12 +1044,13 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我知道 StorageClass 用 `WaitForFirstConsumer` 避免跨 AZ 掛載問題。
 
 **節點 / 維運**
-- [ ] 我能比較 Managed Node Group、Self-managed、Fargate 三種運算模式。
-- [ ] 我能說出 Cluster Autoscaler 與 Karpenter 的差異。
+- [ ] 我能比較 Managed Node Group、Self-managed、Fargate、EKS Auto Mode 四種運算模式。
+- [ ] 我能說出 Cluster Autoscaler 與 Karpenter 的差異,也知道 EKS Auto Mode 內建 Karpenter。
 - [ ] 我了解 EKS Auto Mode 的定位:AWS 代管資料平面(節點 + 核心外掛),以及 ~12% 附加費的計費方式。
 - [ ] 我知道哪些情境適合 Auto Mode(小型團隊、不想管外掛),哪些不適合(自訂 AMI、DaemonSet 存取節點)。
-- [ ] 我知道升級順序是「先 control plane,再 node 與 addon」,且不能跳版。
+- [ ] 我知道升級順序是「先 control plane,再 node 與 addon」,且不能跳版、不能降版。
 - [ ] 我知道 Container Insights / Control Plane Logging 會產生費用。
+- [ ] 我知道目前 Managed Node Group 預設 AMI 是 AL2023,AL2 已停止發布新 AMI。
 
 **成本與清理(保命)**
 - [ ] 我在練習前就設好了 AWS Budget 告警。

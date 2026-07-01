@@ -12,6 +12,8 @@ K8s 對網路有三個基本承諾(由 CNI 網路外掛實作,例如 Calico、Fl
 2. **Pod 之間可以直接用 IP 互通**,不需要 NAT——不管在不在同一台節點。
 3. **節點上的程式也能跟 Pod 用 IP 互通**。
 
+這三條是 [Kubernetes 網路模型](https://kubernetes.io/docs/concepts/services-networking/#the-kubernetes-network-model)的官方定義。
+
 這帶來一個「扁平網路 (flat network)」的直覺:**在叢集內,任何 Pod 都能直接連到任何 Pod 的 IP**,彷彿大家都在同一個區網。
 
 ```mermaid
@@ -50,7 +52,7 @@ flowchart LR
 
 ### 2.1 它怎麼知道後面有哪些 Pod?Endpoints / EndpointSlice
 
-Service 並不直接連 Pod。背後有個機制:**EndpointSlice 控制器**持續掃描「符合 selector 且已就緒 (ready) 的 Pod」,把它們的 IP 列成一份清單。Service 的流量就導向這份清單。
+Service 並不直接連 Pod。背後有個機制:**EndpointSlice 控制器**持續掃描「符合 selector 且已就緒 (ready) 的 Pod」,把它們的 IP 列成一份清單。Service 的流量就導向這份清單。EndpointSlice 是現行的標準機制,取代舊版的 Endpoints API(舊 API 在大規模叢集下有單一物件被截斷等限制,目前已標示為過時)([EndpointSlices 官方文件](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/))。
 
 > 這也是為什麼 readiness 探針(第 5 章)很重要:**沒就緒的 Pod 不會被列入 Endpoints,流量不會打到它。** 升級時這保證了「只有準備好的 Pod 才接客」。
 
@@ -61,7 +63,7 @@ kubectl describe svc web                 # Endpoints 欄位列出後端 IP
 
 ### 2.2 kube-proxy 怎麼讓 ClusterIP 通?
 
-ClusterIP 是個**虛擬 IP**,沒有任何網卡真的擁有它。是每台節點上的 **kube-proxy** 設定了 iptables / IPVS 規則:當有封包要送到這個 ClusterIP,就攔截下來、隨機挑一個後端 Pod IP、改寫目的地。所以負載平衡其實發生在**每台節點的核心網路層**,不是某個集中的代理。
+ClusterIP 是個**虛擬 IP**,沒有任何網卡真的擁有它。是每台節點上的 **kube-proxy** 設定了封包轉發規則(Linux 預設模式是 iptables,另支援 IPVS 與較新的 nftables 模式):當有封包要送到這個 ClusterIP,就攔截下來、(預設)隨機挑一個後端 Pod IP、改寫目的地。所以負載平衡其實發生在**每台節點的核心網路層**,不是某個集中的代理([Virtual IPs and Service Proxies](https://kubernetes.io/docs/reference/networking/virtual-ips/))。
 
 ---
 
@@ -114,7 +116,7 @@ spec:
 
 ### 3.2 NodePort
 
-在「每一台節點」上開一個固定埠(30000-32767),外部用任一節點 IP 加這個埠就能進來。**每台節點都監聽同一個埠**,打到哪台都會被轉進內部的 ClusterIP。
+在「每一台節點」上開一個固定埠(預設範圍 **30000-32767**,可用 kube-apiserver 的 `--service-node-port-range` 調整),外部用任一節點 IP 加這個埠就能進來。**每台節點都監聽同一個埠**,打到哪台都會被轉進內部的 ClusterIP([Service 官方文件 — type: NodePort](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport))。
 
 ```mermaid
 flowchart LR
@@ -199,7 +201,7 @@ spec:
 
 ### 3.5 Headless Service(無頭服務)
 
-特例:把 `clusterIP` 設成 `None`。這時 Service **不分配虛擬 IP、不做負載平衡**,而是讓 DNS 直接回傳「所有後端 Pod 的 IP」。對照前面幾種類型「先連到一個 VIP 再分流」,無頭服務是**把整份 Pod IP 清單交給呼叫方,由呼叫方自己決定連哪個**。第 2 章的 StatefulSet 就靠它給每個 Pod 固定 DNS(`web-0.web...`)。
+特例:把 `clusterIP` 設成 `None`。這時 Service **不分配虛擬 IP、不做負載平衡**,而是讓 DNS 直接回傳「所有後端 Pod 的 IP」。對照前面幾種類型「先連到一個 VIP 再分流」,無頭服務是**把整份 Pod IP 清單交給呼叫方,由呼叫方自己決定連哪個**。第 2 章的 StatefulSet 就靠它給每個 Pod 固定 DNS(`web-0.web...`)([Service 官方文件 — Headless Services](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services))。
 
 ```mermaid
 flowchart LR
@@ -238,9 +240,9 @@ Service 的完整域名 (FQDN) 格式:
 <service-name>.<namespace>.svc.cluster.local
 ```
 
-例如 `default` 命名空間裡的 `web` 服務:`web.default.svc.cluster.local`。
+例如 `default` 命名空間裡的 `web` 服務:`web.default.svc.cluster.local`([DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#services))。
 
-**簡寫規則**(因為 Pod 的 `/etc/resolv.conf` 有 search domain):
+**簡寫規則**(因為 Pod 的 `/etc/resolv.conf` 預設帶有 `search <namespace>.svc.cluster.local svc.cluster.local cluster.local` 這樣的 search domain):
 
 - 同命名空間內:直接用 `web`
 - 跨命名空間:用 `web.其他namespace`
@@ -289,7 +291,7 @@ flowchart LR
 ### 5.1 重要區分:Ingress 物件 vs Ingress Controller
 
 - **Ingress 物件**:你寫的 YAML,只是一份「路由規則的宣告」。
-- **Ingress Controller**:真正讀這份規則、執行反向代理的程式(例如 ingress-nginx、Traefik)。**叢集預設沒有 Controller,你得自己裝。** 沒裝 Controller 的話,Ingress 物件只是擺著不會生效。
+- **Ingress Controller**:真正讀這份規則、執行反向代理的程式(例如 ingress-nginx、Traefik)。**叢集預設沒有 Controller,你得自己裝。** 官方文件明確指出:「只建立 Ingress 資源本身沒有任何效果」,必須搭配 Ingress Controller 才會生效([Ingress 官方文件](https://kubernetes.io/docs/concepts/services-networking/ingress/#ingress-controllers))。
 
 ```bash
 # minikube:啟用內建 ingress-nginx

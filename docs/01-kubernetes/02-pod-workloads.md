@@ -16,7 +16,7 @@
 
 > 為什麼要有 Pod 這層?因為有些容器天生「黏在一起」——例如主應用容器 + 一個負責推送日誌的輔助容器。它們要同生共死、共享資源,但又該是獨立的容器映像。Pod 就是這個「緊密耦合的小團隊」的封裝。
 >
-> **預設原則:一個 Pod 一個容器。** 多容器 Pod 是進階模式 (sidecar),不要濫用。
+> **預設原則:一個 Pod 一個容器。** 官方文件也指出「one-container-per-Pod」是最常見的使用模式,多容器 Pod 屬於進階模式 (sidecar),只在容器真的緊密耦合時才用([Pods 官方文件](https://kubernetes.io/docs/concepts/workloads/pods/#how-pods-manage-multiple-containers))。
 
 ```yaml
 apiVersion: v1
@@ -143,8 +143,8 @@ spec:
   strategy:
     type: RollingUpdate        # 滾動更新(預設),逐步替換不中斷
     rollingUpdate:
-      maxUnavailable: 1        # 升級過程最多允許 1 個副本暫時不可用
-      maxSurge: 1              # 升級過程最多可額外多開 1 個新副本
+      maxUnavailable: 1        # 升級過程最多允許 1 個副本暫時不可用(若省略,預設為 25%)
+      maxSurge: 1              # 升級過程最多可額外多開 1 個新副本(若省略,預設為 25%)
   template:
     metadata:
       labels:
@@ -184,7 +184,7 @@ kubectl rollout pause deployment/web
 kubectl rollout resume deployment/web
 ```
 
-> **設計理念**:滾動更新讓服務在升級時始終有可用副本,搭配 readiness 探針確保「只有準備好的新 Pod 才接流量」。`maxUnavailable` 與 `maxSurge` 是你在「升級速度」與「資源/可用性」之間的旋鈕。
+> **設計理念**:滾動更新讓服務在升級時始終有可用副本,搭配 readiness 探針確保「只有準備好的新 Pod 才接流量」。`maxUnavailable` 與 `maxSurge` 是你在「升級速度」與「資源/可用性」之間的旋鈕,兩者預設值都是 **25%**([Deployment 官方文件](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-unavailable))。
 
 ### 4.3 兩種升級策略比較
 
@@ -209,7 +209,7 @@ Deployment 的 Pod 是**可互換的、匿名的**——叫 `web-7d4f...` 這種
 StatefulSet 給每個 Pod 三樣 Deployment 給不了的東西:
 
 1. **穩定且可預測的名字**:`web-0`、`web-1`、`web-2`(序號固定,不是亂碼)。
-2. **穩定的網路身分**:搭配 Headless Service(第 3 章)讓每個 Pod 有固定 DNS,如 `web-0.web.default.svc.cluster.local`。
+2. **穩定的網路身分**:搭配 Headless Service(第 3 章)讓每個 Pod 有固定 DNS,如 `web-0.web.default.svc.cluster.local`([StatefulSet 官方文件 — Stable Network ID](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#stable-network-id))。
 3. **穩定的專屬儲存**:每個 Pod 透過 `volumeClaimTemplates` 各自綁定一塊 PVC,`web-0` 永遠拿回自己那塊磁碟。
 
 ```yaml
@@ -244,7 +244,7 @@ spec:
             storage: 1Gi
 ```
 
-> **有序性 (ordering)**:StatefulSet 預設按序號**依序**建立(web-0 就緒才建 web-1)、**逆序**刪除。這對需要「先起主節點再起從節點」的系統很重要。
+> **有序性 (ordering)**:StatefulSet 預設的 Pod 管理政策是 `OrderedReady`,按序號**依序**建立(web-0 就緒才建 web-1)、**逆序**刪除;若不需要這個保證,可把 `podManagementPolicy` 設成 `Parallel` 平行建立/刪除。這對需要「先起主節點再起從節點」的系統很重要(詳見 [StatefulSet 官方文件 — Pod Management Policies](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-management-policies))。
 
 ### Deployment vs StatefulSet 對照
 
@@ -307,9 +307,9 @@ kind: Job
 metadata:
   name: data-migration
 spec:
-  completions: 1              # 需要成功完成幾次
-  parallelism: 1             # 同時可平行跑幾個 Pod
-  backoffLimit: 4            # 失敗重試上限,超過就標記 Job 失敗
+  completions: 1              # 需要成功完成幾次(預設 1)
+  parallelism: 1             # 同時可平行跑幾個 Pod(預設 1)
+  backoffLimit: 4            # 失敗重試上限,超過就標記 Job 失敗(若省略,預設為 6)
   template:
     spec:
       restartPolicy: Never    # Job 的 Pod 不能用 Always;通常 Never 或 OnFailure
@@ -319,7 +319,7 @@ spec:
           command: ["./migrate.sh"]
 ```
 
-> `restartPolicy` 必須是 `Never` 或 `OnFailure`——因為 Job 的語意是「做完就停」,不能用會無限重啟的 `Always`。
+> `restartPolicy` 必須是 `Never` 或 `OnFailure`——因為 Job 的語意是「做完就停」,不能用會無限重啟的 `Always`([Job 官方文件](https://kubernetes.io/docs/concepts/workloads/controllers/job/#pod-backoff-failure-policy))。
 
 ### 7.2 CronJob — 定時觸發 Job
 
@@ -351,6 +351,8 @@ spec:
 | `Allow`(預設) | 允許多個 Job 同時跑 |
 | `Forbid` | 前一個沒跑完就跳過這次觸發 |
 | `Replace` | 用新的取代還在跑的舊 Job |
+
+> `successfulJobsHistoryLimit` 預設保留 **3** 筆成功紀錄,`failedJobsHistoryLimit` 預設保留 **1** 筆失敗紀錄([CronJob 官方文件](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/))。
 
 ---
 

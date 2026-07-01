@@ -34,6 +34,8 @@ flowchart LR
 | **Failed**(失敗) | **所有**容器都終止,且**至少一個**是失敗(非 0 退出或被系統終止),不會再重啟 | 任務失敗且不再重試 |
 | **Unknown**(未知) | 通常是**節點失聯**,kubelet 回報不了 Pod 狀態 | 節點當機 / 網路斷,API Server 收不到該節點的心跳 |
 
+> 上述五個值與定義對應 [官方文件 Pod Phase 章節](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase)。
+
 > 注意 `Succeeded` / `Failed` 是**終態**——Pod 不會再從這裡跑回 `Running`。你在第 2 章表格看到的 `Completed`,其實是 kubectl 對「Phase=Succeeded」的友善顯示。
 
 ```bash
@@ -83,7 +85,7 @@ Containers:
 
 ### 2.2 CrashLoopBackOff 到底是什麼
 
-很多人以為 `CrashLoopBackOff` 是一種錯誤——**不是**,它是一種「**退避策略 (back-off)**」。容器一啟動就掛、kubelet 依 `restartPolicy` 想重啟它,但為了避免「死了又起、起了又死」狂燒資源,kubelet 採用**指數退避**:第一次馬上重啟,之後間隔 10s → 20s → 40s …… 最長到 **5 分鐘**封頂。`CrashLoopBackOff` 就是「正在等下一次重試」這個等待狀態。
+很多人以為 `CrashLoopBackOff` 是一種錯誤——**不是**,它是一種「**退避策略 (back-off)**」。容器一啟動就掛、kubelet 依 `restartPolicy` 想重啟它,但為了避免「死了又起、起了又死」狂燒資源,kubelet 採用**指數退避**:第一次馬上重啟,之後間隔 10s → 20s → 40s …… 最長到 **5 分鐘**封頂(較新版本可透過 kubelet 的 `crashLoopBackOff.maxContainerRestartPeriod` 設定調整上限)。`CrashLoopBackOff` 就是「正在等下一次重試」這個等待狀態([官方文件](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#crashloopbackoff))。
 
 ```mermaid
 flowchart LR
@@ -114,7 +116,7 @@ flowchart LR
 | **OnFailure** | 只有**失敗(非 0 退出)**才重啟,成功就結束 | Job / CronJob:要跑到成功為止 |
 | **Never** | **永不**重啟,結束就結束 | Job:不想重試、或重試交給上層控制 |
 
-> 為什麼預設是 `Always`?因為大多數 Pod 是常駐服務,你會希望它「永遠活著」,掛了自動拉回。但這也解釋了第 2 章的限制:**Job 的 Pod 不能用 `Always`**——Job 的語意是「做完就停」,用會無限重啟的 Always 邏輯上矛盾,所以只能 `OnFailure` 或 `Never`。這兩段知識在此對上了。
+> 為什麼預設是 `Always`?因為大多數 Pod 是常駐服務,你會希望它「永遠活著」,掛了自動拉回。但這也解釋了第 2 章的限制:**Job 的 Pod 不能用 `Always`**——Job 的語意是「做完就停」,用會無限重啟的 Always 邏輯上矛盾,所以只能 `OnFailure` 或 `Never`。這兩段知識在此對上了([官方文件](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy))。
 
 ```yaml
 apiVersion: v1
@@ -215,7 +217,7 @@ sequenceDiagram
    - **(b) kubelet 啟動關閉流程**:kubelet 幾乎同時開始對容器執行關閉。
 4. **執行 preStop hook**(若有):kubelet 先跑完 preStop,才往下走。
 5. **送 SIGTERM**:對容器內的 **PID 1**(回想 Linux 篇:你的主程式就是容器內的 PID 1)送出 SIGTERM。
-6. **等待寬限期** `terminationGracePeriodSeconds`(預設 **30 秒**):給應用收尾的時間。
+6. **等待寬限期** `terminationGracePeriodSeconds`([預設 **30 秒**](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination)):給應用收尾的時間。
 7. **逾時送 SIGKILL**:寬限期到了還活著,kubelet 送 SIGKILL 強制終結(對應退出碼 137)。
 8. **清除物件**:確認容器都沒了,API Server 才真正刪掉 Pod 物件。
 
@@ -316,9 +318,11 @@ flowchart LR
 | 特性 | 行為 | 為什麼這樣設計 |
 |------|------|----------------|
 | **依序執行** | 一個跑完(成功)才跑下一個,不並行 | 初始化常有先後依賴(先建表才能填資料) |
-| **必須成功** | 任一 init 容器失敗,kubelet 依 `restartPolicy` **重試**(Always/OnFailure 會重跑),整個 Pod 卡在 `Init:Error` / `Init:CrashLoopBackOff` | 前置條件沒滿足,主容器不該啟動 |
+| **必須成功** | 任一 init 容器失敗,**kubelet 會重複重試該 init 容器**直到成功;但若 Pod 的 `restartPolicy` 是 `Never`,則不重試,整個 Pod 直接判定為 Failed。重試中會看到 Pod 卡在 `Init:Error` / `Init:CrashLoopBackOff` | 前置條件沒滿足,主容器不該啟動 |
 | **跑完就退場** | 成功後就終止,**不會**和主容器一起常駐 | 它只做「一次性準備」,不是服務 |
 | **看 Pod 階段** | init 期間 Pod 仍是 **Pending**,容器狀態顯示 `Init:0/2` 之類 | 對應第 1 節:還沒有主容器在跑 |
+
+> 上述規則出自[官方文件 Init Containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior):「the kubelet repeatedly restarts that init container until it succeeds」,例外是 `restartPolicy: Never` 時不重試、直接判定 Pod 失敗。
 
 ### 6.2 init 容器 vs 主容器
 
@@ -326,7 +330,7 @@ flowchart LR
 |------|-----------|---------------------|
 | 執行方式 | 依序、一個接一個 | (一般容器)並行啟動 |
 | 生命週期 | 跑完即退,不常駐 | 常駐(直到 Pod 結束) |
-| 探針 | **不支援** liveness/readiness/startup | 支援 |
+| 探針 | **不支援** liveness/readiness/startup([官方文件](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#differences-from-regular-containers)) | 支援 |
 | 失敗影響 | 卡住整個 Pod 啟動 | 依 restartPolicy 就地重啟 |
 
 ### 6.3 典型用途與範例
@@ -364,7 +368,7 @@ spec:
 
 ---
 
-## 7. 原生輔助容器 (Native Sidecar):K8s 1.28+
+## 7. 原生輔助容器 (Native Sidecar):v1.28 引入、v1.33 GA
 
 第 2 章提過 sidecar 是「黏在主容器旁的輔助容器」(如推送日誌、service mesh 代理)。傳統做法是把 sidecar 當成另一個普通主容器並列在 `containers` 裡——但這有兩個老問題。
 
@@ -375,7 +379,7 @@ spec:
 
 ### 7.2 原生 sidecar 怎麼做
 
-K8s 1.28+(1.29 預設啟用)推出**原生 sidecar**:把輔助容器寫在 **`initContainers`** 裡,並給它 **`restartPolicy: Always`**。這個特殊組合讓它行為完全不同於一般 init 容器:
+K8s [v1.28 以 alpha 引入、v1.29 起 beta 預設啟用、v1.33 GA 穩定](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/)的**原生 sidecar**:把輔助容器寫在 **`initContainers`** 裡,並給它 **`restartPolicy: Always`**。這個特殊組合讓它行為完全不同於一般 init 容器:
 
 ```yaml
 spec:
@@ -413,7 +417,7 @@ spec:
 | 關閉順序 | 一起關,無保證 | **主容器先關、sidecar 後關** |
 | 支援探針 | 支援 | 支援(可設 startup/readiness/liveness) |
 | 對 Job 的影響 | 會卡住 Job 永不結束 | **不會卡住,Job 正常完成** |
-| K8s 版本 | 任何版本 | 需 **1.28+**(1.29 預設啟用) |
+| K8s 版本 | 任何版本 | [v1.28 引入,v1.29 起預設啟用,v1.33 GA](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) |
 
 > **設計理念**:原生 sidecar 借用 init 容器「有順序、在主容器之前」的特性,再用 `restartPolicy: Always` 賦予它「常駐、生命週期被妥善管理」的能力。一句話:**把 sidecar 的生命週期變得可預測**(先起後關),這正是傳統做法最缺的東西。
 
@@ -460,7 +464,9 @@ spec:
 | `periodSeconds` | 多久探一次 | 越短反應越快,但對應用造成的探測負擔越大;一般 5～10 秒 |
 | `timeoutSeconds` | 單次探測等多久算逾時 | 預設 1 秒常太短,健檢端點若會變慢,適度調高避免假性失敗 |
 | `successThreshold` | 連續成功幾次才算「好了」 | readiness 想避免抖動可 > 1;**liveness/startup 只能是 1** |
-| `failureThreshold` | 連續失敗幾次才算「壞了」 | 調高 = 更寬容、少誤殺;調低 = 更快反應真故障。和 `periodSeconds` 一起決定「多久才判定不健康」 |
+| `failureThreshold` | 連續失敗幾次才算「壞了」(預設 3) | 調高 = 更寬容、少誤殺;調低 = 更快反應真故障。和 `periodSeconds` 一起決定「多久才判定不健康」 |
+
+> 上表預設值(`timeoutSeconds=1`、`periodSeconds=10`、`successThreshold=1`、`failureThreshold=3`)出自 [Probe 物件的官方欄位定義](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#probe-v1-core)。
 
 > 一個實用公式:**判定不健康所需時間 ≈ `periodSeconds × failureThreshold`**。例如 `periodSeconds: 10` + `failureThreshold: 3` ⇒ 大約 30 秒持續失敗才會重啟容器。把這個算清楚,就不會把 liveness 設得太敏感而無謂重啟(第 5 章的核心提醒)。
 
@@ -491,7 +497,7 @@ spec:
 - [ ] 能說明應用程式該如何攔截並處理 SIGTERM,以及容器內 PID 1 / `exec` / tini 的訊號陷阱(回扣 Linux 篇)
 - [ ] 理解 `terminationGracePeriodSeconds` 涵蓋 preStop + 收尾,預設 30 秒
 - [ ] 能說明 init 容器的依序執行、失敗重試、跑完退場,以及三種典型用途
-- [ ] 能說明原生 sidecar(initContainers + restartPolicy: Always)相對傳統 sidecar 的好處:先啟動、後關閉、不卡 Job(需 1.28+)
+- [ ] 能說明原生 sidecar(initContainers + restartPolicy: Always)相對傳統 sidecar 的好處:先啟動、後關閉、不卡 Job(v1.28 引入、v1.29 起預設啟用、v1.33 GA)
 - [ ] 能補充 exec / tcpSocket 探針方式,並用 `periodSeconds × failureThreshold` 估算判定不健康的時間
 
 > 下一章:回到 [README.md](./README.md) 串起整個 Kubernetes 核心地圖;掌握了生命週期與優雅關閉,你已經能寫出「升級不掉請求、關閉不丟資料」的正式級工作負載了。
