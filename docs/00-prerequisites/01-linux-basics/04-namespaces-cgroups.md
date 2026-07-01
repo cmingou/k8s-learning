@@ -168,49 +168,153 @@ sudo nsenter --target 1234 --net ip addr
 | **PID 數量** | 限制能開幾個行程(防 fork 炸彈) |
 | **網路 / 裝置** | 計量與存取控制 |
 
-### cgroup 也是「檔案」:藏在 /sys/fs/cgroup
+### 4.1 cgroup 也是「檔案」:一切都在 /sys/fs/cgroup
 
-cgroup 透過 `/sys/fs/cgroup` 這個虛擬檔案系統操作。現代系統用 **cgroup v2**(統一階層):
+cgroup v2 把「一個資源群組」表示成 `/sys/fs/cgroup` 底下的**一個目錄**;群組的限制、用量、成員全都是這個目錄裡的**檔案**——用 `cat` 讀、用 `echo >` 寫,不需要任何特殊 API。
 
 ```bash
-# 看 cgroup 版本與掛載
+# 看 cgroup 版本與掛載(v2 會看到 cgroup2 這個檔案系統型別)
 mount | grep cgroup
-ls /sys/fs/cgroup/
+ls /sys/fs/cgroup/            # 根 cgroup 的介面檔 + 各子群組目錄
 
-# 看某行程屬於哪個 cgroup
+# 看「目前這個 shell」屬於哪個 cgroup(v2 固定是單行 0::/...)
 cat /proc/$$/cgroup
+# 例如:0::/user.slice/user-1000.slice/session-3.scope
 ```
 
-### 親手驗證:用 cgroup 限制記憶體
+每個 cgroup 目錄都有幾個**核心介面檔**:
+
+| 檔案 | 作用 |
+|------|------|
+| `cgroup.procs` | 這個群組裡有哪些行程(PID);把 PID `echo` 進去 = 把行程「搬進」這個群組 |
+| `cgroup.controllers` | 這個群組**可用**哪些控制器(cpu、memory、io、pids…) |
+| `cgroup.subtree_control` | 這個群組**下放給子群組**哪些控制器(要控制子群組的資源,得先在這裡開啟) |
+| `<資源>.max` / `.current` / `.stat` / `.events` | 各控制器的「上限 / 目前用量 / 統計 / 事件計數」 |
+
+> ⚠️ **v2 的「統一階層」**:cgroup v1 每種資源各有一棵樹(`/sys/fs/cgroup/memory/`、`/cpu/`…);v2 只有**一棵樹**,一個群組同時掌管所有資源。現代發行版(systemd)預設都是 v2,可用 `stat -fc %T /sys/fs/cgroup/` 確認(顯示 `cgroup2fs` 就是 v2)。
+
+各控制器最常用的檔案:
+
+| 控制器 | 設上限 | 看用量 / 統計 |
+|--------|--------|--------------|
+| **memory** | `memory.max`(硬上限,超過→OOM Kill)、`memory.high`(軟上限,超過→節流回收但不殺) | `memory.current`(目前用量)、`memory.stat`(細項)、`memory.events`(含 `oom_kill` 次數) |
+| **cpu** | `cpu.max`(硬上限,格式「配額 週期」微秒)、`cpu.weight`(權重,預設 100) | `cpu.stat`(`usage_usec`、被節流次數 `nr_throttled`、`throttled_usec`) |
+| **pids** | `pids.max`(最多幾個行程) | `pids.current`(目前幾個) |
+| **io** | `io.max`(每個裝置的 `rbps/wbps/riops/wiops`) | `io.stat`(每裝置讀寫量) |
+
+### 4.2 親手配置限制:逐一舉例
+
+先建立一個群組,並確認 root 已把控制器「下放」給子群組:
 
 ```bash
-# (cgroup v2)建立一個 cgroup
+# root cgroup 是否已把控制器下放給子群組?(systemd 系統通常已含 cpu memory pids)
+cat /sys/fs/cgroup/cgroup.subtree_control
+# 若少了想用的控制器,補開啟(需 root):
+echo "+cpu +memory +pids +io" | sudo tee /sys/fs/cgroup/cgroup.subtree_control
+
+# 建立一個叫 demo 的 cgroup(本質就是 mkdir 一個目錄)
 sudo mkdir /sys/fs/cgroup/demo
+ls /sys/fs/cgroup/demo/       # 目錄一建好,memory.max / cpu.max… 介面檔就自動出現了
+```
 
-# 設定記憶體上限為 50MB
-echo "50M" | sudo tee /sys/fs/cgroup/demo/memory.max
+**① 記憶體上限(`memory.max`)**
 
-# 把目前的 shell 放進這個 cgroup
+```bash
+echo "50M" | sudo tee /sys/fs/cgroup/demo/memory.max     # 硬上限 50MB,超過就 OOM Kill
+echo "40M" | sudo tee /sys/fs/cgroup/demo/memory.high    # 軟上限:到 40MB 開始節流回收(不殺)
+
+# 把目前 shell 丟進 demo,之後這個 shell 開的程式都受此限制
 echo $$ | sudo tee /sys/fs/cgroup/demo/cgroup.procs
 
-# 現在在這個 shell 裡跑一個吃記憶體的程式,超過 50MB 就會被 OOM Kill
-# (例如用 stress-ng 或一段 python),核心會強制終止它
-
-# 清理:把 shell 移出去後刪掉 cgroup
+# 跑一個吃 100MB 的程式,會在超過 50MB 時被 OOM Kill
+stress-ng --vm 1 --vm-bytes 100M --timeout 10s
+# 之後 dmesg | tail 會看到 "Memory cgroup out of memory",該行程被砍
 ```
+
+**② CPU 上限(`cpu.max`)**
+
+`cpu.max` 的格式是「**配額 週期**」(單位微秒):每個「週期」內最多用「配額」這麼多 CPU 時間。
+
+```bash
+# 每 100ms 週期最多用 50ms → 等於「半顆 CPU」(0.5 CPU)
+echo "50000 100000" | sudo tee /sys/fs/cgroup/demo/cpu.max
+
+# 若只想調「相對權重」(大家都忙時誰分得多)而非硬上限,用 cpu.weight(預設 100)
+echo "200" | sudo tee /sys/fs/cgroup/demo/cpu.weight      # 權重加倍
+```
+
+**③ 行程數上限(`pids.max`)——防 fork 炸彈**
+
+```bash
+echo "20" | sudo tee /sys/fs/cgroup/demo/pids.max         # 這群組最多開 20 個行程
+cat /sys/fs/cgroup/demo/pids.current                      # 看目前開了幾個
+```
+
+**④ 磁碟 I/O 上限(`io.max`)**
+
+```bash
+lsblk                                                     # 先查裝置的「主:次」編號,例如 259:0
+# 限制對該裝置的寫入頻寬為 10 MB/s(10*1024*1024 = 10485760)
+echo "259:0 wbps=10485760" | sudo tee /sys/fs/cgroup/demo/io.max
+```
+
+> 💡 **更省事、也不會跟 systemd 打架的做法**:用 `systemd-run` 一行搞定,它會自動幫你建 cgroup、設好對應的 `.max` 並在結束後清掉:
+> ```bash
+> # MemoryMax→memory.max;CPUQuota=50%→cpu.max(半顆);TasksMax→pids.max
+> sudo systemd-run --scope -p MemoryMax=50M -p CPUQuota=50% -p TasksMax=20 \
+>   stress-ng --vm 1 --vm-bytes 100M
+> ```
+
+### 4.3 從 /sys/fs/cgroup 查看「現有」限制與實際用量
+
+排查時你常常不是要「設定」,而是要「看某個容器**現在被限多少、用了多少、有沒有被卡**」。步驟是:**先找到它的 cgroup 目錄,再讀裡面的檔案。**
+
+```bash
+# 1) 找出容器主行程的 PID(以 Docker 為例)
+PID=$(docker inspect -f '{{.State.Pid}}' my-container)
+
+# 2) 看它屬於哪個 cgroup(v2 是單行 0::/...)
+cat /proc/$PID/cgroup
+# 例如:0::/system.slice/docker-<id>.scope
+CG=/sys/fs/cgroup/system.slice/docker-<id>.scope         # 換成上面看到的路徑
+
+# 3) 讀它的限制與用量
+cat $CG/memory.max        # 記憶體硬上限(對應 docker --memory / K8s limits.memory)
+cat $CG/memory.current    # 目前用了多少記憶體(bytes)
+cat $CG/memory.events     # oom_kill 那一行 > 0,代表曾被 OOM 砍過
+cat $CG/cpu.max           # CPU 硬上限(配額 週期);"max 100000" 代表沒設限
+cat $CG/cpu.stat          # 看 nr_throttled / throttled_usec:被 CPU 限制「節流」幾次
+cat $CG/pids.current      # 目前開了幾個行程
+```
+
+> 🔑 **`cpu.stat` 的 `nr_throttled` 是排查「服務變慢、但主機 CPU 明明沒滿」的神器**:一個容器只要設了 `cpu.max`,即使主機很閒,它一旦在該週期內用超過配額,就會被**節流 (throttling)** 強制暫停到下個週期,表現成延遲飆高。看到 `nr_throttled` / `throttled_usec` 一直漲,就知道該調高 CPU limit 了。
+
+> 💡 **壓力指標 (PSI)**:每個 cgroup 還有 `cpu.pressure`、`memory.pressure`、`io.pressure`,顯示「因資源不足而**卡住等待**的時間比例」,比單看用量更早發出過載預警。
+
+### 4.4 對應到 K8s:你寫的 resources 就是這些檔案
 
 > 🔑 **這正是 K8s `resources` 的底層!**
 > 當你在 K8s 寫:
 > ```yaml
 > resources:
->   requests:        # 排程器用來決定放哪個節點(保證量)
+>   requests:        # 排程用(保證量);CPU 換成 cpu.weight「權重」
 >     cpu: "250m"
 >     memory: "256Mi"
 >   limits:          # 硬上限,由 cgroup 強制執行
->     cpu: "500m"
->     memory: "512Mi"
+>     cpu: "500m"     # → cpu.max = "50000 100000"(半顆 CPU)
+>     memory: "512Mi" # → memory.max = 536870912(bytes)
 > ```
-> 那個 `limits.memory: 512Mi`,kubelet 最終就是翻譯成 cgroup 的 `memory.max`。容器吃記憶體超過 512Mi,就會被 **OOMKilled**(你在 `kubectl describe pod` 會看到這個字)。**你剛剛親手做的實驗,就是 K8s 每天在做的事。**
+> kubelet 把 `limits.memory` 翻成 `memory.max`、`limits.cpu` 翻成 `cpu.max`、`requests.cpu` 翻成 `cpu.weight`。容器記憶體超過 `memory.max` 就被 **OOMKilled**(`kubectl describe pod` 看得到那個字);CPU 超過 `cpu.max` 則被**節流**(反映在 `cpu.stat` 的 `nr_throttled`)。
+>
+> 在節點上甚至能直接讀某個 Pod 的 cgroup(systemd cgroup driver 下,依 QoS 分屬不同 slice):
+> ```bash
+> # BestEffort / Burstable / Guaranteed 三種 QoS 各在不同子 slice 下
+> ls /sys/fs/cgroup/kubepods.slice/
+> # 讀某容器的實際上限與是否被節流(路徑裡的 pod<uid> 與容器 id 用 Tab 補全找)
+> cat /sys/fs/cgroup/kubepods.slice/.../cri-containerd-<id>.scope/memory.max
+> cat /sys/fs/cgroup/kubepods.slice/.../cri-containerd-<id>.scope/cpu.stat
+> ```
+> **你剛剛親手做的實驗(建 cgroup、寫 `memory.max` / `cpu.max`、讀 `cpu.stat`),就是 kubelet 每天在每個節點上替你做的事。**
 
 ---
 
