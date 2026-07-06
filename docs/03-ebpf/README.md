@@ -437,7 +437,7 @@ func main() {
 - 大型叢集動輒**數千個 Service、數萬條規則**——實務上規模來到約 5000 個 Service(對應數萬條規則)時效能就會明顯惡化,封包每次轉送都要從頭掃這串長鏈,延遲與 CPU 隨規模**線性惡化**。
 - 規則更新需要**整批重載 (atomic replace)**,在高變動環境下成本高昂。
 
-> **現況補充**:K8s 社群也意識到此問題,`kube-proxy` 的 **nftables 模式**已於 **1.33** 版 GA、用近似 `O(1)` 的映射結構解決了同樣的效能問題([Kubernetes 官方部落格:NFTables mode for kube-proxy](https://kubernetes.io/blog/2025/02/28/nftables-kube-proxy/))。IPVS 模式則已在 **1.35** 版被標記為棄用、預計 **1.36** 版移除,社群建議改用 nftables(詳見 [kubernetes/enhancements#5495](https://github.com/kubernetes/enhancements/issues/5495) 與 1.35 release notes)。但 iptables 目前仍是上游預設模式,且 nftables/IPVS 都只解決了「Service 轉送」這一項問題,並未涵蓋 eBPF 在身分型網路策略、L7 可視性、無侵入式可觀測性上的能力——這正是 Cilium 等 eBPF 方案除了取代 kube-proxy 之外仍有價值的原因。
+> **現況補充**:K8s 社群也意識到此問題,`kube-proxy` 的 **nftables 模式**已於 **1.33** 版 GA、用近似 `O(1)` 的映射結構解決了同樣的效能問題([Kubernetes 官方部落格:NFTables mode for kube-proxy](https://kubernetes.io/blog/2025/02/28/nftables-kube-proxy/))。IPVS 模式已在 **1.35** 版被標記為棄用;但截至 **1.36**(2026 年 4 月釋出、目前最新穩定版)為止**尚未移除**——IPVS 後端仍在運作並持續收到 bug 修正,官方是在開發中的 **1.37** 版才新增 `KubeProxyIPVS` 功能閘門,作為日後停用、移除前的準備,實際移除版本尚未定案,社群建議新部署改用 nftables(詳見 [kubernetes/enhancements#5495](https://github.com/kubernetes/enhancements/issues/5495) 與 [Kubernetes v1.37 CHANGELOG](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.37.md))。但 iptables 目前仍是上游預設模式,且 nftables/IPVS 都只解決了「Service 轉送」這一項問題,並未涵蓋 eBPF 在身分型網路策略、L7 可視性、無侵入式可觀測性上的能力——這正是 Cilium 等 eBPF 方案除了取代 kube-proxy 之外仍有價值的原因。
 
 ```mermaid
 flowchart TD
