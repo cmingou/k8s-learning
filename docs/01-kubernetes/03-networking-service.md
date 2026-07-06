@@ -357,8 +357,9 @@ spec:
 > - [K8s Blog:Gateway API v1.0 GA 公告](https://kubernetes.io/blog/2023/10/31/gateway-api-ga/)
 > - [K8s Blog:Gateway API v1.1 GA 公告](https://kubernetes.io/blog/2024/05/09/gateway-api-v1-1/)
 > - [K8s Blog:Gateway API v1.5 公告](https://kubernetes.io/blog/2026/04/21/gateway-api-v1-5/)
+> - [Gateway API GitHub Releases](https://github.com/kubernetes-sigs/gateway-api/releases)
 >
-> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;截至 2026 年中最新為 **v1.5**(2026 年 2 月),新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.5 下皆維持穩定、可直接使用。
+> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;v1.5(2026 年 2 月)新增 `ListenerSet`、TLSRoute、CORS filter、client cert 驗證等能力晉升為 Standard Channel;截至 2026 年中最新為 **v1.6.0**(2026 年 6 月),讓 **UDPRoute / TCPRoute 晉升為 GA(`v1` API,取代舊版 `v1alpha2`)**。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.6 下皆維持穩定、可直接使用。
 
 #### 為什麼 Ingress 不夠用?
 
@@ -404,13 +405,15 @@ flowchart TB
 | **HTTPRoute** | `v1` | ✅ Stable (v1.0.0) | HTTP/HTTPS 路由規則 |
 | **GRPCRoute** | `v1` | ✅ Stable (v1.1.0) | gRPC 路由規則 |
 | **ReferenceGrant** | `v1beta1` | ✅ Standard Channel | 授權跨命名空間引用 |
+| **TLSRoute** | — | ✅ Standard Channel(v1.5 起) | TLS SNI 層路由(passthrough) |
+| **TCPRoute / UDPRoute** | `v1`(取代 `v1alpha2`) | ✅ Standard Channel、GA(v1.6 起) | 純 TCP/UDP 四層路由 |
 
-> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。TCPRoute / UDPRoute / TLSRoute 目前在實驗性 (Experimental) Channel。
+> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。TLSRoute 已於 **v1.5**、TCPRoute/UDPRoute 已於 **v1.6** 晉升為 Standard Channel;安裝時仍需注意 Standard Channel 只包含**穩定版**資源,若要用其他仍在實驗性 (Experimental) Channel 的新特性(例如較新的 GEP 提案),需另外安裝 Experimental Channel 的 CRD,詳見 [Gateway API Releases](https://github.com/kubernetes-sigs/gateway-api/releases)。
 
 #### 安裝 Gateway API CRD
 
 ```bash
-# 安裝 Standard Channel(穩定版):GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant
+# 安裝 Standard Channel(穩定版):GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant / TLSRoute / TCPRoute / UDPRoute(v1.6 起)
 # 版本請至 https://github.com/kubernetes-sigs/gateway-api/releases 確認最新版
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/latest/download/standard-install.yaml
 
