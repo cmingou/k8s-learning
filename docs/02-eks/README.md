@@ -894,7 +894,7 @@ eksctl create addon --name amazon-cloudwatch-observability --cluster my-first-ek
 
 EKS 升級分兩步,**順序很重要**(詳見官方〈[Update existing cluster to new Kubernetes version](https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html)〉):
 
-1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.33 → 1.34,不能跳版;且**控制平面無法降版**,降版只能整個重建叢集)。
+1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.33 → 1.34,不能跳版)。若升級後 7 天內發現問題,可用 [Amazon EKS version rollback](https://docs.aws.amazon.com/eks/latest/userguide/rollback-cluster.html) 以 `aws eks update-cluster-version --kubernetes-version <前一版本>` 就地退回**前一個**小版本(N → N-1,不能跳版退回,且叢集須是「就地升級」而來、不能是直接以該版本建立的叢集);超過 7 天或已再次升級過,就只能重建叢集。
 2. **再升 Node Group / 外掛**:讓節點的 kubelet 版本追上,並升級 VPC CNI、CoreDNS、kube-proxy 等 Addon。
 
 ```bash
@@ -1048,7 +1048,7 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我能說出 Cluster Autoscaler 與 Karpenter 的差異,也知道 EKS Auto Mode 內建 Karpenter。
 - [ ] 我了解 EKS Auto Mode 的定位:AWS 代管資料平面(節點 + 核心外掛),以及 ~12% 附加費的計費方式。
 - [ ] 我知道哪些情境適合 Auto Mode(小型團隊、不想管外掛),哪些不適合(自訂 AMI、DaemonSet 存取節點)。
-- [ ] 我知道升級順序是「先 control plane,再 node 與 addon」,且不能跳版、不能降版。
+- [ ] 我知道升級順序是「先 control plane,再 node 與 addon」,且不能跳版;降版現在可透過 EKS version rollback 在升級後 7 天內退回前一個小版本,但仍不能跳版退回。
 - [ ] 我知道 Container Insights / Control Plane Logging 會產生費用。
 - [ ] 我知道目前 Managed Node Group 預設 AMI 是 AL2023,AL2 已停止發布新 AMI。
 
