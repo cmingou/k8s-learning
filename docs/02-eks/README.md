@@ -894,7 +894,7 @@ eksctl create addon --name amazon-cloudwatch-observability --cluster my-first-ek
 
 EKS 升級分兩步,**順序很重要**(詳見官方〈[Update existing cluster to new Kubernetes version](https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html)〉):
 
-1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.33 → 1.34,不能跳版;且**控制平面無法降版**,降版只能整個重建叢集)。
+1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.33 → 1.34,不能跳版)。**降版**:EKS 現在支援原地 **rollback** 回上一個小版本(N → N-1),但有時間限制——必須在該次升級完成後 **7 天內**發起,且叢集須是「原地升級」而來(非直接以該版本建立),詳見 [Rollback cluster to previous Kubernetes version](https://docs.aws.amazon.com/eks/latest/userguide/rollback-cluster.html)。超過這個窗口,或不符合條件,才需要整個重建叢集。
 2. **再升 Node Group / 外掛**:讓節點的 kubelet 版本追上,並升級 VPC CNI、CoreDNS、kube-proxy 等 Addon。
 
 ```bash

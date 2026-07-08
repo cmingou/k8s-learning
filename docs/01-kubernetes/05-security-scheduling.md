@@ -65,7 +65,7 @@ spec:
       image: my-app:1.0
 ```
 
-> 安全建議:**不要讓應用 Pod 用 default SA 並給它過大權限。** 為需要呼叫 API 的應用建專屬 SA,只授予剛好夠用的權限(最小權限原則)。不需要呼叫 API 的 Pod,可關掉自動掛 token(`automountServiceAccountToken: false`)——這是[官方 RBAC Good Practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation-permission)明確建議的加固手法。
+> 安全建議:**不要讓應用 Pod 用 default SA 並給它過大權限。** 為需要呼叫 API 的應用建專屬 SA,只授予剛好夠用的權限(最小權限原則)。不需要呼叫 API 的 Pod,可關掉自動掛 token(`automountServiceAccountToken: false`)——這是[官方 RBAC Good Practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#hardening)明確建議的加固手法。
 
 ---
 
@@ -288,16 +288,16 @@ kubectl get hpa -w               # 觀察副本數隨負載變化
 
 傳統上改一個容器的 `requests` / `limits` 只有一條路:**刪掉 Pod 再重建**——這對資料庫等有狀態服務極為痛苦。**In-Place Pod Resize** 讓你在不重啟容器的情況下就地調整 CPU / 記憶體配額。
 
-> **版本時間軸**:Alpha(1.27)→ Beta 且預設啟用(1.33)→ **Stable GA(1.35)**
+> **版本時間軸**:Alpha(1.27)→ Beta 且預設啟用(1.33)→ **Stable GA(1.35)**。詳見 [Resize CPU and Memory Resources assigned to Containers](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/) 與 [Kubernetes v1.33: In-Place Pod Resize (Beta)](https://kubernetes.io/blog/2025/05/16/kubernetes-v1-33-in-place-pod-resize-beta/)。
 
 ```bash
 # 就地修改 running Pod 的資源配額(不重啟容器,K8s 1.33+)
 kubectl patch pod my-pod --subresource=resize --type=merge \
   -p '{"spec":{"containers":[{"name":"app","resources":{"requests":{"cpu":"500m","memory":"512Mi"},"limits":{"cpu":"1","memory":"1Gi"}}}]}}'
 
-# 觀察 resize 的狀態
-kubectl get pod my-pod -o jsonpath='{.status.resize}{"\n"}'
-# 可能值: Proposed(建議中) → InProgress(套用中) → Applied(成功) / Infeasible(節點資源不足)
+# 觀察 resize 的狀態:Beta(1.33)後改用 Pod conditions,不再是舊的 status.resize 欄位
+kubectl describe pod my-pod | grep -A2 PodResize
+# 關注兩個 condition:PodResizePending(reason: Deferred / Infeasible)、PodResizeInProgress
 ```
 
 **控制哪些資源需要重啟**(`resizePolicy`):

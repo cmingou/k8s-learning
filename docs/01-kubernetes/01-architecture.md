@@ -102,7 +102,7 @@ ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \
 |------|------|
 | **分散式鍵值資料庫** | 資料以 key-value 形式儲存,K8s 把每個物件都存成一筆筆的 key。 |
 | **強一致性 (strong consistency)** | 用 **Raft 共識演算法**,任何一筆寫入都要多數節點確認才算成立,讀到的永遠是最新且一致的資料(不是「最終一致」)。 |
-| **Watch 機制** | 客戶端可以「訂閱」某個 key 的變化,一有變動立刻被通知。**這正是 K8s 調和迴圈的引擎**——API Server / 控制器靠 watch etcd 才能即時對變化做出反應。 |
+| **Watch 機制** | 客戶端可以「訂閱」某個 key 的變化,一有變動立刻被通知。**這正是 K8s 調和迴圈的引擎**——但只有 **API Server** 是 etcd 的客戶端;controller-manager / scheduler / cloud-controller-manager 都是 watch **API Server** 提供的 watch API 來即時反應變化,不會直接碰 etcd([Kubernetes API 概念](https://kubernetes.io/docs/concepts/overview/kubernetes-api/)、[元件總覽:etcd](https://kubernetes.io/docs/concepts/overview/components/#etcd))。 |
 | **MVCC + revision** | 每次寫入都有一個遞增的版本號 (revision),支援多版本並行與歷史查詢。 |
 | **Lease(租約)/ TTL** | key 可綁定有期限的租約,用來做 leader 選舉、分散式鎖。 |
 | **對磁碟延遲敏感** | 每筆寫入要 fsync 落盤並複製給多數節點,**強烈建議用 SSD**;磁碟慢會直接拖垮整個叢集的反應速度。 |
@@ -208,7 +208,7 @@ kubelet 是跑在**每一台節點上**的代理程式 (agent)。它的職責很
 
 ### 4.3 kube-proxy — 讓 Service 的虛擬 IP 能通
 
-kube-proxy 也跑在每台節點上,負責實作 **Service 的網路規則**。當你建立一個 Service,它會有一個虛擬 IP(ClusterIP),kube-proxy 在每台節點上設定 iptables 規則(目前 Linux 上的預設模式;另支援 IPVS 與較新的 `nftables` 模式),讓送到這個虛擬 IP 的流量被導到後面真正的 Pod([kube-proxy 代理模式](https://kubernetes.io/docs/reference/networking/virtual-ips/#proxy-modes))。第 3 章會詳述。
+kube-proxy 也跑在每台節點上,負責實作 **Service 的網路規則**。當你建立一個 Service,它會有一個虛擬 IP(ClusterIP),kube-proxy 在每台節點上設定規則,讓送到這個虛擬 IP 的流量被導到後面真正的 Pod。目前 Linux 上仍以 **iptables** 為預設模式;**IPVS** 模式自 v1.35 起已標為 `deprecated`,預計 v1.36 移除;新一代的 **`nftables`** 模式已在 v1.33 GA,是官方建議用來取代 iptables/IPVS 的方向([kube-proxy 代理模式](https://kubernetes.io/docs/reference/networking/virtual-ips/#proxy-modes))。第 3 章會詳述。
 
 ---
 
