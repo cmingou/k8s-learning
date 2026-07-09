@@ -357,8 +357,10 @@ spec:
 > - [K8s Blog:Gateway API v1.0 GA 公告](https://kubernetes.io/blog/2023/10/31/gateway-api-ga/)
 > - [K8s Blog:Gateway API v1.1 GA 公告](https://kubernetes.io/blog/2024/05/09/gateway-api-v1-1/)
 > - [K8s Blog:Gateway API v1.5 公告](https://kubernetes.io/blog/2026/04/21/gateway-api-v1-5/)
+> - [Gateway API Releases(GitHub,v1.6.0)](https://github.com/kubernetes-sigs/gateway-api/releases)
+> - [官方文件:TCPRoute 狀態](https://gateway-api.sigs.k8s.io/reference/api-types/tcproute/) / [UDPRoute 狀態](https://gateway-api.sigs.k8s.io/reference/api-types/udproute/)
 >
-> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;截至 2026 年中最新為 **v1.5**(2026 年 2 月),新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.5 下皆維持穩定、可直接使用。
+> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;v1.5(2026 年 2 月)新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證晉升為 Standard Channel;**截至 2026 年中最新為 v1.6(2026 年 6 月)**,`TCPRoute`、`UDPRoute` 也雙雙晉升為 GA / Standard Channel。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.6 下皆維持穩定、可直接使用。
 
 #### 為什麼 Ingress 不夠用?
 
@@ -404,13 +406,16 @@ flowchart TB
 | **HTTPRoute** | `v1` | ✅ Stable (v1.0.0) | HTTP/HTTPS 路由規則 |
 | **GRPCRoute** | `v1` | ✅ Stable (v1.1.0) | gRPC 路由規則 |
 | **ReferenceGrant** | `v1beta1` | ✅ Standard Channel | 授權跨命名空間引用 |
+| **TLSRoute** | `v1` | ✅ Standard Channel(v1.5.0 起) | TLS 直通 (passthrough) 路由 |
+| **TCPRoute** | `v1` | ✅ Standard Channel(v1.6.0 起) | 純 TCP 埠轉發路由 |
+| **UDPRoute** | `v1` | ✅ Standard Channel(v1.6.0 起) | 純 UDP 埠轉發路由 |
 
-> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。TCPRoute / UDPRoute / TLSRoute 目前在實驗性 (Experimental) Channel。
+> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。TCPRoute、UDPRoute、TLSRoute 過去長期停留在實驗性 (Experimental) Channel,但已分別於 v1.6.0、v1.6.0、v1.5.0 晉升為 Standard Channel GA。詳見官方〈[TCPRoute](https://gateway-api.sigs.k8s.io/reference/api-types/tcproute/)〉〈[UDPRoute](https://gateway-api.sigs.k8s.io/reference/api-types/udproute/)〉〈[TLSRoute](https://gateway-api.sigs.k8s.io/reference/api-types/tlsroute/)〉狀態頁。
 
 #### 安裝 Gateway API CRD
 
 ```bash
-# 安裝 Standard Channel(穩定版):GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant
+# 安裝 Standard Channel(穩定版,v1.6 起含):GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant / TLSRoute / TCPRoute / UDPRoute
 # 版本請至 https://github.com/kubernetes-sigs/gateway-api/releases 確認最新版
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/latest/download/standard-install.yaml
 
