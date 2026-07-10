@@ -404,8 +404,11 @@ flowchart TB
 | **HTTPRoute** | `v1` | ✅ Stable (v1.0.0) | HTTP/HTTPS 路由規則 |
 | **GRPCRoute** | `v1` | ✅ Stable (v1.1.0) | gRPC 路由規則 |
 | **ReferenceGrant** | `v1beta1` | ✅ Standard Channel | 授權跨命名空間引用 |
+| **TLSRoute** | `v1` | ✅ Standard Channel (v1.5.0) | TLS passthrough 路由(依 SNI 分流) |
+| **TCPRoute** | `v1` | ✅ Standard Channel (v1.6.0) | 純 TCP 路由;`v1alpha2` 已棄用 |
+| **UDPRoute** | `v1` | ✅ Standard Channel (v1.6.0) | 純 UDP 路由;`v1alpha2` 已棄用 |
 
-> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。TCPRoute / UDPRoute / TLSRoute 目前在實驗性 (Experimental) Channel。
+> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。TCPRoute / UDPRoute 已於 [v1.6.0](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.0) 晉升 Standard Channel(建議改用 `v1`,`v1alpha2` 已棄用);TLSRoute 更早在 v1.5.0 就已進入 Standard Channel——三者都**不再是實驗性功能**。
 
 #### 安裝 Gateway API CRD
 
