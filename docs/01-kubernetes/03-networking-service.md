@@ -294,12 +294,14 @@ flowchart LR
 - **Ingress Controller**:真正讀這份規則、執行反向代理的程式(例如 ingress-nginx、Traefik)。**叢集預設沒有 Controller,你得自己裝。** 官方文件明確指出:「只建立 Ingress 資源本身沒有任何效果」,必須搭配 Ingress Controller 才會生效([Ingress 官方文件](https://kubernetes.io/docs/concepts/services-networking/ingress/#ingress-controllers))。
 
 ```bash
-# minikube:啟用內建 ingress-nginx
+# minikube:啟用內建 ingress-nginx(僅供教學實驗,正式環境請見下方退役公告)
 minikube addons enable ingress
 
-# kind:手動安裝 ingress-nginx
+# kind:手動安裝 ingress-nginx(僅供教學實驗)
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 ```
+
+> ⚠️ **重要公告:Ingress NGINX 專案已於 2026 年 3 月退役**。Kubernetes Steering 與 Security Response Committee 聯合聲明,`ingress-nginx` 因長期僅有 1–2 位志工維護、且既有設計難以安全地繼續維護,已停止發布任何新版本、修補與安全更新;官方估計約 50% 的雲原生環境曾使用它,退役後**既有部署仍會繼續運作,但不會再有安全性修補**([Kubernetes 官方聲明:Ingress NGINX Retirement](https://kubernetes.io/blog/2026/01/29/ingress-nginx-statement/))。因此上面的指令僅適合本機教學用途;正式環境請改用 **Gateway API**(見 5.3 節)或其他仍在維護的 Ingress Controller(如 Traefik)。若要檢查叢集是否還在用它:`kubectl get pods --all-namespaces --selector app.kubernetes.io/name=ingress-nginx`。
 
 ### 5.2 Ingress 範例
 
@@ -358,7 +360,7 @@ spec:
 > - [K8s Blog:Gateway API v1.1 GA 公告](https://kubernetes.io/blog/2024/05/09/gateway-api-v1-1/)
 > - [K8s Blog:Gateway API v1.5 公告](https://kubernetes.io/blog/2026/04/21/gateway-api-v1-5/)
 >
-> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;截至 2026 年中最新為 **v1.5**(2026 年 2 月),新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.5 下皆維持穩定、可直接使用。
+> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;v1.5(2026 年 2 月)新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel;其後的 [v1.6.0](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.0)(約 2026 年 5 月)再把 `TCPRoute`、`UDPRoute` 晉升為 GA。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 是較早晉升 Standard Channel 的資源,在最新版下皆維持穩定、可直接使用;建立叢集前建議查 [Gateway API 官方文件](https://gateway-api.sigs.k8s.io/) 確認當下最新版本與各資源所在的 Channel。
 
 #### 為什麼 Ingress 不夠用?
 
