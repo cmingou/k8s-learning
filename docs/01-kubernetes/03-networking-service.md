@@ -63,7 +63,7 @@ kubectl describe svc web                 # Endpoints 欄位列出後端 IP
 
 ### 2.2 kube-proxy 怎麼讓 ClusterIP 通?
 
-ClusterIP 是個**虛擬 IP**,沒有任何網卡真的擁有它。是每台節點上的 **kube-proxy** 設定了封包轉發規則(Linux 預設模式是 iptables,另支援 IPVS 與較新的 nftables 模式):當有封包要送到這個 ClusterIP,就攔截下來、(預設)隨機挑一個後端 Pod IP、改寫目的地。所以負載平衡其實發生在**每台節點的核心網路層**,不是某個集中的代理([Virtual IPs and Service Proxies](https://kubernetes.io/docs/reference/networking/virtual-ips/))。
+ClusterIP 是個**虛擬 IP**,沒有任何網卡真的擁有它。是每台節點上的 **kube-proxy** 設定了封包轉發規則(Linux 預設模式是 iptables;較新的 nftables 模式已於 v1.33 GA 但尚未成為預設;舊有的 IPVS 模式已於 [v1.35 標記為棄用](https://kubernetes.io/docs/reference/networking/virtual-ips/#proxy-mode-ipvs),不建議新叢集採用):當有封包要送到這個 ClusterIP,就攔截下來、(預設)隨機挑一個後端 Pod IP、改寫目的地。所以負載平衡其實發生在**每台節點的核心網路層**,不是某個集中的代理([Virtual IPs and Service Proxies](https://kubernetes.io/docs/reference/networking/virtual-ips/))。
 
 ---
 
@@ -357,8 +357,9 @@ spec:
 > - [K8s Blog:Gateway API v1.0 GA 公告](https://kubernetes.io/blog/2023/10/31/gateway-api-ga/)
 > - [K8s Blog:Gateway API v1.1 GA 公告](https://kubernetes.io/blog/2024/05/09/gateway-api-v1-1/)
 > - [K8s Blog:Gateway API v1.5 公告](https://kubernetes.io/blog/2026/04/21/gateway-api-v1-5/)
+> - [Gateway API v1.6.0 Release Notes](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.0)
 >
-> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;截至 2026 年中最新為 **v1.5**(2026 年 2 月),新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.5 下皆維持穩定、可直接使用。
+> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;v1.5(2026 年 2 月)新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel;最新的 **v1.6** 進一步把 `TCPRoute`、`UDPRoute` 也晉升為 Standard Channel(GA,`v1` API 版本)。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant,在 v1.5/v1.6 下皆維持穩定、可直接使用。
 
 #### 為什麼 Ingress 不夠用?
 
@@ -405,7 +406,7 @@ flowchart TB
 | **GRPCRoute** | `v1` | ✅ Stable (v1.1.0) | gRPC 路由規則 |
 | **ReferenceGrant** | `v1beta1` | ✅ Standard Channel | 授權跨命名空間引用 |
 
-> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。TCPRoute / UDPRoute / TLSRoute 目前在實驗性 (Experimental) Channel。
+> Gateway API 是**獨立的 CRD**,不隨 K8s 版本內建,需額外安裝。`TLSRoute` 已於 v1.5 晉升 Standard Channel;`TCPRoute`、`UDPRoute` 也已於 v1.6 晉升 Standard Channel(GA)——目前這幾個路由類型都不再是純實驗性功能,細節請以官方 [Release Notes](https://github.com/kubernetes-sigs/gateway-api/releases) 為準。
 
 #### 安裝 Gateway API CRD
 

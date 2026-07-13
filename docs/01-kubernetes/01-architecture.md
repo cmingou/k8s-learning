@@ -208,7 +208,7 @@ kubelet 是跑在**每一台節點上**的代理程式 (agent)。它的職責很
 
 ### 4.3 kube-proxy — 讓 Service 的虛擬 IP 能通
 
-kube-proxy 也跑在每台節點上,負責實作 **Service 的網路規則**。當你建立一個 Service,它會有一個虛擬 IP(ClusterIP),kube-proxy 在每台節點上設定 iptables 規則(目前 Linux 上的預設模式;另支援 IPVS 與較新的 `nftables` 模式),讓送到這個虛擬 IP 的流量被導到後面真正的 Pod([kube-proxy 代理模式](https://kubernetes.io/docs/reference/networking/virtual-ips/#proxy-modes))。第 3 章會詳述。
+kube-proxy 也跑在每台節點上,負責實作 **Service 的網路規則**。當你建立一個 Service,它會有一個虛擬 IP(ClusterIP),kube-proxy 在每台節點上設定 iptables 規則(目前 Linux 上的預設模式;較新的 `nftables` 模式已於 v1.33 GA,但尚未成為預設;舊有的 IPVS 模式已於 [v1.35 標記為棄用](https://kubernetes.io/docs/reference/networking/virtual-ips/#proxy-mode-ipvs),不建議新叢集採用),讓送到這個虛擬 IP 的流量被導到後面真正的 Pod([kube-proxy 代理模式](https://kubernetes.io/docs/reference/networking/virtual-ips/#proxy-modes))。第 3 章會詳述。
 
 ---
 
