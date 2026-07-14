@@ -358,6 +358,7 @@ spec:
 > - [K8s Blog:Gateway API v1.1 GA 公告](https://kubernetes.io/blog/2024/05/09/gateway-api-v1-1/)
 > - [K8s Blog:Gateway API v1.5 公告](https://kubernetes.io/blog/2026/04/21/gateway-api-v1-5/)
 > - [Gateway API v1.6.0 Release Notes](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.0)
+> - [官方文件:TCPRoute 狀態](https://gateway-api.sigs.k8s.io/reference/api-types/tcproute/) / [UDPRoute 狀態](https://gateway-api.sigs.k8s.io/reference/api-types/udproute/)
 >
 > **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;v1.5(2026 年 2 月)新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel,ReferenceGrant 也在此版由 `v1beta1` 升為 `v1`;截至 2026 年中最新為 **v1.6.0**(2026 年 6 月),讓 **UDPRoute / TCPRoute 晉升為 GA(`v1` API,取代舊版 `v1alpha2`)**。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.6 下皆維持穩定、可直接使用。
 
