@@ -569,7 +569,7 @@ spec:
 | **Envoy Gateway** | CNCF 專案,以 Envoy 為底層 |
 | **Contour** | VMware 維護,以 Envoy 為底層 |
 | **Traefik** | 支援 Gateway API(v3+) |
-| **AWS Load Balancer Controller** | EKS 官方實作;v3.0.0(2026 GA)起**原生**支援 Gateway API,以 CRD 設定(L7 → ALB、L4 → NLB),不再靠 annotation |
+| **AWS Load Balancer Controller** | EKS 官方實作;v3.0.0(2026 GA)起**原生**支援 Gateway API,以 CRD 設定(L7 → ALB、L4 → NLB),不再靠 annotation([AWS 官方公告](https://aws.amazon.com/blogs/networking-and-content-delivery/aws-load-balancer-controller-adds-general-availability-support-for-kubernetes-gateway-api/)) |
 
 > **實務建議**:新叢集**優先評估 Gateway API**;現有叢集的 Ingress **不需要立刻遷移**(Ingress 不會被棄用),但新功能只會出現在 Gateway API 上。
 
