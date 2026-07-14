@@ -760,7 +760,10 @@ spec:
 | AWS Load Balancer Controller | 你安裝並管理 | **AWS 自動管** |
 | 節點整併 (Consolidation) | 需要 Karpenter 或手動 | **自動整併** |
 | 自訂 AMI / kernel 調整 | 支援 | ❌ **不支援** |
-| DaemonSet / 直接 SSH 進節點 | 支援 | ❌ 受限 |
+| 直接 SSH / SSM 進節點 | 支援 | ❌ **不支援**(節點鎖定,禁止直連) |
+| 在節點上跑 DaemonSet | 支援 | ✅ **支援**(官方建議用 DaemonSet 取代直接改節點,作為 Auto Mode 下客製化節點行為的方式) |
+
+> 官方文件明確說明:「Rather than modify services installed on your nodes, you can instead use Kubernetes daemonsets…」,DaemonSet 是 Auto Mode 下受支援、官方建議的節點客製化方式,真正被鎖死的是「直接 SSH/SSM 進節點」與「自訂 AMI」。詳見〈[Configuration - EKS Auto Mode](https://docs.aws.amazon.com/eks/latest/userguide/automode.html)〉。
 
 ```mermaid
 flowchart LR
@@ -848,7 +851,7 @@ EKS Auto Mode 費用 = EC2 費用 + 節點管理費用:
 | 小/中型團隊,想專注應用不想管基礎架構 | ✅ **優先選 Auto Mode** |
 | 剛上 EKS,不熟悉 Addon 管理與節點升級 | ✅ 降低入門門檻 |
 | 需要自訂 AMI(GPU driver、特殊 kernel 設定) | ❌ 選標準 EKS + 自管節點 |
-| 需要在節點安裝 DaemonSet 代理 / 直接 SSH 節點 | ❌ 選標準 EKS |
+| 需要直接 SSH / SSM 進節點除錯或安裝節點層代理 | ❌ 選標準 EKS(Auto Mode 節點鎖定、禁止直連;DaemonSet 本身在 Auto Mode 是支援的) |
 | 嚴格合規要求直接掌控節點設定與映像 | ❌ 選標準 EKS |
 | 已有成熟 Karpenter 設定且成本極度敏感 | ⚠️ 評估 12% 溢價是否合算 |
 
@@ -894,8 +897,10 @@ eksctl create addon --name amazon-cloudwatch-observability --cluster my-first-ek
 
 EKS 升級分兩步,**順序很重要**(詳見官方〈[Update existing cluster to new Kubernetes version](https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html)〉):
 
-1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.33 → 1.34,不能跳版;且**控制平面無法降版**,降版只能整個重建叢集)。
+1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.33 → 1.34,不能跳版)。
 2. **再升 Node Group / 外掛**:讓節點的 kubelet 版本追上,並升級 VPC CNI、CoreDNS、kube-proxy 等 Addon。
+
+> **新功能(2026 年 7 月起):版本降版 (Version Rollback)**。EKS 現已支援把控制平面**降回上一個小版本**([Amazon EKS now supports Kubernetes version rollback](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-version-rollback/);詳見官方〈[Rollback cluster to previous Kubernetes version](https://docs.aws.amazon.com/eks/latest/userguide/rollback-cluster.html)〉),不再像過去那樣「降版只能重建叢集」。關鍵限制:**必須在升級完成後 7 天內**發起、**一次只能降一個小版本**(N → N-1,不能跳版)、且**僅適用於透過「原地升級」升上來的叢集**(叢集建立時就是該版本則無法降版)。指令與升級共用同一個 API:`aws eks update-cluster-version --name my-cluster --kubernetes-version <上一版>`。Managed Node Group 需另外用 `update-nodegroup-version` 個別降版,EKS Auto Mode 會自動一併處理節點降版;但**降版不支援 Fargate 節點**(需先手動刪除跑在目標降版本上的 Fargate Pod,否則會觸發 kubelet 版本偏移的 ERROR 提示)。EKS 附加元件 (Addon) 版本也**不會**自動跟著降版,需自行檢查相容性並視需要手動調整版本。
 
 ```bash
 # 升級控制平面(一次升一個 minor 版本;版本號請以官方目前標準支援清單為準)
@@ -1047,8 +1052,8 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我能比較 Managed Node Group、Self-managed、Fargate、EKS Auto Mode 四種運算模式。
 - [ ] 我能說出 Cluster Autoscaler 與 Karpenter 的差異,也知道 EKS Auto Mode 內建 Karpenter。
 - [ ] 我了解 EKS Auto Mode 的定位:AWS 代管資料平面(節點 + 核心外掛),以及 ~12% 附加費的計費方式。
-- [ ] 我知道哪些情境適合 Auto Mode(小型團隊、不想管外掛),哪些不適合(自訂 AMI、DaemonSet 存取節點)。
-- [ ] 我知道升級順序是「先 control plane,再 node 與 addon」,且不能跳版、不能降版。
+- [ ] 我知道哪些情境適合 Auto Mode(小型團隊、不想管外掛),哪些不適合(自訂 AMI、直接 SSH 進節點);也知道 DaemonSet 在 Auto Mode 下其實是支援的。
+- [ ] 我知道升級順序是「先 control plane,再 node 與 addon」,且不能跳版;若升級後 7 天內出狀況,可用新的版本降版 (Version Rollback) 功能降回上一個小版本,但 Fargate 節點不支援降版、Addon 版本也不會自動跟著降。
 - [ ] 我知道 Container Insights / Control Plane Logging 會產生費用。
 - [ ] 我知道目前 Managed Node Group 預設 AMI 是 AL2023,AL2 已停止發布新 AMI。
 
