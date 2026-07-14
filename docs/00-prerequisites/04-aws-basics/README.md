@@ -364,7 +364,9 @@ EKS 節點是一台 EC2,它的網路卡(彈性網路介面 (ENI))可以掛上多
 |------|----------|
 | VPC、子網路、路由表、IGW | **免費** |
 | NAT 閘道 | **按小時 + 按流量計費,即使閒置也收錢!** 學習用完務必刪除 |
-| 彈性 IP (Elastic IP) / 公有 IPv4 位址 | **自 2024/2/1 起,所有公有 IPv4 位址一律按小時計費**(每個 IP 約 0.005 美元/小時),**不論有沒有綁定執行中的資源**——不再是「綁定就免費」。詳見 [AWS 官方公告](https://aws.amazon.com/blogs/aws/new-aws-public-ipv4-address-charge-public-ip-insights/) |
+| 彈性 IP (Elastic IP) / 公有 IPv4 位址 | **自 2024/2/1 起一律按小時計費**(約 $0.005/hr),不論是否綁定資源 |
+
+> 公有 IPv4 過去「綁定執行中資源就免費」,此優惠已取消,詳見 [AWS 官方公告](https://aws.amazon.com/blogs/aws/new-aws-public-ipv4-address-charge-public-ip-insights/)。
 
 ### 3.6 VPC 相關 CLI(示意)
 
