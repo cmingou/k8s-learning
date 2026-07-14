@@ -271,7 +271,7 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: fast
-provisioner: kubernetes.io/aws-ebs    # 由哪個 driver 建立實際儲存
+provisioner: ebs.csi.aws.com          # 由哪個 driver 建立實際儲存(AWS EBS CSI driver;舊的 in-tree kubernetes.io/aws-ebs 已在 v1.27 移除)
 parameters:
   type: gp3
 reclaimPolicy: Delete                  # PVC 刪掉時連同 PV 與磁碟一起刪
@@ -291,6 +291,8 @@ spec:
       storage: 10Gi
 ```
 
+> 早期 K8s 內建 in-tree volume plugin(如 `kubernetes.io/aws-ebs`、`kubernetes.io/gce-pd`),但這些已陸續棄用並移除——AWS EBS 的 in-tree driver 在 v1.19 棄用、**v1.27 完全移除**,現在一律改用各雲廠商發布的 **out-of-tree CSI driver**(見 [StorageClass 官方文件 - AWS EBS](https://kubernetes.io/docs/concepts/storage/storage-classes/#aws-ebs))。
+>
 > 在 kind / minikube,通常已內建一個 default StorageClass(`standard` 或 `local-path`),所以你**連 StorageClass 都不用自己寫**,直接建 PVC 就會動態供應。
 > ```bash
 > kubectl get storageclass        # 看叢集有哪些 SC,哪個是 (default)

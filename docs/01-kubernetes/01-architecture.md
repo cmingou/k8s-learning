@@ -102,7 +102,7 @@ ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \
 |------|------|
 | **分散式鍵值資料庫** | 資料以 key-value 形式儲存,K8s 把每個物件都存成一筆筆的 key。 |
 | **強一致性 (strong consistency)** | 用 **Raft 共識演算法**,任何一筆寫入都要多數節點確認才算成立,讀到的永遠是最新且一致的資料(不是「最終一致」)。 |
-| **Watch 機制** | 客戶端可以「訂閱」某個 key 的變化,一有變動立刻被通知。**這正是 K8s 調和迴圈的引擎**——API Server / 控制器靠 watch etcd 才能即時對變化做出反應。 |
+| **Watch 機制** | 客戶端可以「訂閱」某個 key 的變化,一有變動立刻被通知。**這正是 K8s 調和迴圈的引擎**——但只有 **API Server** 是 etcd 的客戶端;controller-manager / scheduler / cloud-controller-manager 都是 watch **API Server** 提供的 watch API 來即時反應變化,不會直接碰 etcd([Kubernetes API 概念](https://kubernetes.io/docs/concepts/overview/kubernetes-api/)、[元件總覽:etcd](https://kubernetes.io/docs/concepts/overview/components/#etcd))。 |
 | **MVCC + revision** | 每次寫入都有一個遞增的版本號 (revision),支援多版本並行與歷史查詢。 |
 | **Lease(租約)/ TTL** | key 可綁定有期限的租約,用來做 leader 選舉、分散式鎖。 |
 | **對磁碟延遲敏感** | 每筆寫入要 fsync 落盤並複製給多數節點,**強烈建議用 SSD**;磁碟慢會直接拖垮整個叢集的反應速度。 |
