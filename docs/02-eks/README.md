@@ -715,7 +715,7 @@ eksctl create fargateprofile \
 | 運作方式 | 調整既有 **Node Group / ASG** 的數量 | **直接、即時**幫你挑機型、開 EC2,不綁固定 Node Group |
 | 機型彈性 | 受限於你預先定義的 Node Group 機型 | 自動從眾多機型挑最划算的(含 Spot) |
 | 擴容速度 | 較慢(走 ASG) | 較快、更省成本 |
-| 複雜度 | 成熟、單純 | API 已於 v1 版(`karpenter.sh/v1`)穩定為 GA,AWS 官方建議的擴縮方案 |
+| 複雜度 | 成熟、單純 | API 已於 v1 版(`karpenter.sh/v1`)穩定為 GA |
 
 ```yaml
 # Karpenter NodePool 範例(節錄):讓它自動挑便宜機型、優先用 Spot
@@ -737,6 +737,8 @@ spec:
 ```
 
 > 成本觀點:**Karpenter 的 `consolidation`(整併)會主動把閒置/低使用率節點收掉**,是很有效的省錢機制。設 `limits` 上限可避免擴容失控。
+>
+> 該怎麼選?AWS 官方[最佳實踐指南](https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html)給的是「依工作負載特性」而非一律建議 Karpenter:「Karpenter is best used for clusters with workloads that encounter periods of high, spiky demand or have diverse compute requirements. MNGs and ASGs are good for clusters running workloads that tend to be more static and consistent.」——負載忽高忽低、機型需求多樣就選 Karpenter;負載穩定單純,Node Group + CA 一樣夠用且更省心。
 
 ### 7.3 EKS Auto Mode:讓 AWS 管理整個資料平面
 
@@ -833,12 +835,12 @@ aws eks update-cluster-config \
 
 #### 計費模式
 
-EKS Auto Mode 費用 = EC2 費用 + 節點管理費用:
+EKS Auto Mode 費用 = EC2 費用 + 節點管理費用(官方[定價頁](https://aws.amazon.com/eks/pricing/)明載「the EKS Auto Mode charges are independent of the EC2 instance purchase option」,即附加費不分 On-Demand / Spot):
 
 | 費用項目 | 計費方式 |
 |---|---|
 | EC2 On-Demand 節點 | EC2 原價 **+ 約 12% 附加費**(AWS 代管節點生命週期費) |
-| EC2 Spot 節點 | Spot 原價(附加費較低) |
+| EC2 Spot 節點 | Spot 原價 **+ 相同的附加費**(附加費是依機型固定收取,不因採購方式而異;總價較低只是因為 Spot 的 EC2 底價較低) |
 | EKS Control Plane | 同標準 EKS(約 $0.10/hr/叢集) |
 | 核心外掛(VPC CNI 等) | 不另收 Addon 費用(已含在附加費內) |
 

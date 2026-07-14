@@ -552,7 +552,7 @@ grep -E 'CONFIG_BPF|CONFIG_DEBUG_INFO_BTF' /boot/config-$(uname -r)
 | 資源 | 類型 | 說明 |
 | --- | --- | --- |
 | **[ebpf.io](https://ebpf.io/)** | 官方入口 | eBPF 基金會官網,概念、生態系、文件總匯,**最佳起點** |
-| **[《Learning eBPF》— Liz Rice](https://isovalent.com/books/learning-ebpf/)** | 書籍 | 由淺入深的入門經典,O'Reilly 出版,Isovalent 提供免費電子版下載 |
+| **[《Learning eBPF》— Liz Rice](https://www.oreilly.com/library/view/learning-ebpf/9781098135119/)** | 書籍 | 由淺入深的入門經典,O'Reilly 出版(2023 年 3 月) |
 | **[Cilium 官方文件](https://docs.cilium.io/)** | 文件 | K8s 上實戰 eBPF 網路 / 安全 / Hubble 的權威來源 |
 | **[libbpf-bootstrap](https://github.com/libbpf/libbpf-bootstrap)** | 範本 | libbpf + CO-RE 的官方起手範本,寫 C 必看 |
 | **[cilium/ebpf](https://github.com/cilium/ebpf)** | 函式庫 | Go 開發者寫 eBPF 的主流函式庫,含豐富範例 |
