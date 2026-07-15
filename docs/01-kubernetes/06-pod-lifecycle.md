@@ -144,7 +144,7 @@ K8s 讓你在容器生命的兩個關鍵時刻插入動作:
 | **postStart** | 容器**建立後**立即執行(與容器主程序**並行**,不保證在主程序前完成) | 暖機、寫旗標檔、初始化(用途不多) |
 | **preStop** | 容器**被終止前**執行,**會等它跑完**才送 SIGTERM | 連線排空 (drain)、通知註冊中心下線、收尾 |
 
-兩種 hook 都支援 `exec`(執行指令)、`httpGet`(打一個 HTTP 請求)、`tcpSocket` 三種 handler。
+兩種 hook 都支援 `exec`(執行指令)、`httpGet`(打一個 HTTP 請求)、`sleep`(單純暫停指定秒數,`PodLifecycleSleepAction` 於 **v1.34** 晉升穩定版)三種 handler;舊有的 `tcpSocket` handler 目前在 hook 情境下已標示為[棄用](https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#hook-handler-implementations)(探針中的 `tcpSocket` 不受影響)。
 
 ```yaml
 spec:
@@ -249,11 +249,13 @@ spec:
       image: my-web:1.0
       lifecycle:
         preStop:
-          exec:
-            # 先睡 10 秒等 endpoint 傳播,期間應用照常服務「已建立」的連線
-            command: ["/bin/sh", "-c", "sleep 10"]
+          sleep:
+            # 純粹「睡幾秒」屬於 v1.34 起 GA 的原生 sleep action,不必再借用 exec + sleep 指令
+            seconds: 10
 ```
 
+> 💡 純粹「睡 N 秒」這種需求,**v1.34** 起可直接用原生 `sleep` action(如上),不必再繞道 `exec: sh -c "sleep 10"`——省了額外開一個 shell 行程的開銷。詳見[官方文件 Container Lifecycle Hooks](https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/)。
+>
 > ⚠️ 別把寬限期設太小:`terminationGracePeriodSeconds` 必須涵蓋 **preStop 時間 + SIGTERM 後收尾時間**。若你 preStop sleep 10 秒、應用收尾要 20 秒,寬限期至少要 > 30 秒,否則收尾還沒做完就被 SIGKILL 砍了。
 
 ### 5.3 應用程式該如何正確處理 SIGTERM
