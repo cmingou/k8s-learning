@@ -277,12 +277,13 @@ kubectl debug my-pod -it --image=ubuntu --share-processes --copy-to=my-pod-debug
 
 > **臨時容器的特性**:它沒有資源保證、不會重啟、不能設探針、不能定義 port——它就是個「臨時診斷工具」,診斷完 Pod 重建就消失。這也是為什麼它和正常容器分開(放在 `ephemeralContainers` 欄位),不會污染 Pod 的正式規格。詳見[官方文件 Ephemeral Containers](https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/)。
 
-**進節點除錯**:有時問題不在 Pod 而在節點本身(磁碟滿了、kubelet 異常、核心日誌)。`kubectl debug node/<node>` 會起一個能存取該節點檔案系統與命名空間的特權容器:
+**進節點除錯**:有時問題不在 Pod 而在節點本身(磁碟滿了、kubelet 異常、核心日誌)。`kubectl debug node/<node>` 會起一個共享節點 IPC/Network/PID 命名空間的除錯 Pod——但**預設不是特權容器**,`chroot /host` 或讀取部分行程資訊可能因權限不足而失敗;需要特權存取時要另外加 `--profile=sysadmin`([官方文件](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/#node-shell-session)):
 
 ```bash
 kubectl debug node/worker-1 -it --image=ubuntu
 #   進去後,節點的根檔案系統會掛在 /host 底下
-#   chroot /host 就能像 SSH 進節點一樣操作(看 /var/log、檢查 disk、跑 crictl 等)
+#   chroot /host 多數情況可行,但若因權限不足失敗:
+#   kubectl debug node/worker-1 -it --image=ubuntu --profile=sysadmin  # 換成特權容器
 ```
 
 > 行為細節(`--target`、`--copy-to`、`--share-processes`、節點除錯掛載 `/host`)見[官方文件 Debugging Running Pods](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/)。
