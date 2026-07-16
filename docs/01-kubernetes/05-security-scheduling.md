@@ -288,7 +288,7 @@ kubectl get hpa -w               # 觀察副本數隨負載變化
 
 傳統上改一個容器的 `requests` / `limits` 只有一條路:**刪掉 Pod 再重建**——這對資料庫等有狀態服務極為痛苦。**In-Place Pod Resize** 讓你在不重啟容器的情況下就地調整 CPU / 記憶體配額。
 
-> **版本時間軸**:Alpha(1.27)→ Beta 且預設啟用(1.33)→ **Stable GA(1.35)**。詳見 [Resize CPU and Memory Resources assigned to Containers](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/) 與 [Kubernetes v1.33: In-Place Pod Resize (Beta)](https://kubernetes.io/blog/2025/05/16/kubernetes-v1-33-in-place-pod-resize-beta/)。
+> **版本時間軸**:Alpha(1.27)→ Beta 且預設啟用(1.33)→ **Stable GA(1.35)**。詳見 [Resize CPU and Memory Resources assigned to Containers](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/)、[Kubernetes v1.33: In-Place Pod Resize (Beta)](https://kubernetes.io/blog/2025/05/16/kubernetes-v1-33-in-place-pod-resize-beta/) 與 [Kubernetes 1.35: In-Place Pod Resize Graduates to Stable](https://kubernetes.io/blog/2025/12/19/kubernetes-v1-35-in-place-pod-resize-ga/)。
 
 ```bash
 # 就地修改 running Pod 的資源配額(不重啟容器,K8s 1.33+)
@@ -512,7 +512,7 @@ spec:
 **經典用途**:
 
 - **專用節點**:給 GPU 節點打汙點,只有需要 GPU 且帶對應容忍的 Pod 能上去,一般 Pod 不會浪費這些昂貴節點。
-- **控制平面節點**:`kubeadm` 建立的 control-plane 節點預設帶汙點 `node-role.kubernetes.io/control-plane:NoSchedule`,所以你的應用 Pod 不會被排到大腦上(見[官方文件 Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/))。DaemonSet(第 2 章)若要連 control-plane 也跑,就得加容忍。
+- **控制平面節點**:`kubeadm` 建立的 control-plane 節點預設帶汙點 `node-role.kubernetes.io/control-plane:NoSchedule`,所以你的應用 Pod 不會被排到大腦上(見[官方文件 Creating a cluster with kubeadm — Control plane node isolation](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#control-plane-node-isolation))。DaemonSet(第 2 章)若要連 control-plane 也跑,就得加容忍。
 
 ### Affinity 與 Taint/Toleration 對照
 
