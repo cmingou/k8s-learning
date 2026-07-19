@@ -144,7 +144,8 @@ nohup ./long-task.sh > out.log 2>&1 &   # 登出也不會被殺掉
 | `SIGKILL` | 9 | **強制立刻砍掉** | ❌ 不能被攔截,核心直接終結 |
 | `SIGINT` | 2 | 中斷(你按 Ctrl+C) | 可以 |
 | `SIGHUP` | 1 | 終端機關閉 / 請重載設定 | 可以 |
-| `SIGSTOP` | 19 | 暫停(你按 Ctrl+Z) | ❌ 不能被攔截 |
+| `SIGSTOP` | 19 | **強制**暫停,只能用 `kill -STOP` 送 | ❌ 不能被攔截 |
+| `SIGTSTP` | 20 | 暫停(你按 Ctrl+Z 送出的其實是這個,不是 SIGSTOP) | 可以,程式能攔截/忽略(例如某些程式讓 Ctrl+Z 失效) |
 
 ```bash
 kill 1234            # 預設送 SIGTERM(15),請 PID 1234 優雅結束

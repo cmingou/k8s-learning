@@ -273,7 +273,7 @@ data:
 
 **新做法(推薦):Access Entries + Access Policies**
 
-AWS 後來推出 **[存取項目 (Access Entries)](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html)**,直接用 AWS API / Console 管理「IAM 身份 → K8s 權限」的對應,不再需要手改 ConfigMap。目前 `aws-auth` ConfigMap 已被官方文件列為**舊式做法 (legacy)**,新叢集建議直接把驗證模式 (Authentication Mode) 設為 `API`,完全改用 Access Entries:
+AWS 後來推出 **[存取項目 (Access Entries)](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html)**,直接用 AWS API / Console 管理「IAM 身份 → K8s 權限」的對應,不再需要手改 ConfigMap。官方文件現已明確將 `aws-auth` ConfigMap 標示為**已棄用 (deprecated)**,新叢集建議直接把驗證模式 (Authentication Mode) 設為 `API`,完全改用 Access Entries:
 
 ```bash
 # 用 Access Entry 把一個 IAM 角色加入叢集,並賦予叢集管理員權限
@@ -793,7 +793,7 @@ eksctl create cluster \
   --name my-auto-eks \
   --region ap-northeast-1 \
   --version 1.33 \
-  --auto-mode
+  --enable-auto-mode
 ```
 
 **方式二:Config File(推薦,可版本控管)**
@@ -904,7 +904,7 @@ EKS 升級分兩步,**順序很重要**(詳見官方〈[Update existing cluster 
 
 > **新功能(2026 年 7 月起):版本降版 (Version Rollback)**。EKS 現已支援把控制平面**降回上一個小版本**,不再像過去那樣「降版只能重建叢集」([AWS 公告](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-version-rollback/)、[官方文件](https://docs.aws.amazon.com/eks/latest/userguide/rollback-cluster.html))。
 >
-> - **限制**:須在升級完成後 **7 天內**發起;一次只能降一個小版本(N → N-1,不能跳版);僅適用於透過「原地升級」升上來的叢集(叢集建立時就是該版本則無法降版)。
+> - **限制**:須在升級完成後 **7 天內**發起;一次只能降一個小版本(N → N-1,不能跳版);僅適用於透過「原地升級」升上來的叢集(叢集建立時就是該版本則無法降版);若目標版本落在延伸支援 (Extended Support) 內,須先把叢集升級政策 (Upgrade Policy) 改成 `EXTENDED` 才能降版;若叢集是在**延伸支援到期**時被自動升級的,則完全無法降版。
 > - **指令**:與升級共用同一個 API——`aws eks update-cluster-version --name my-cluster --kubernetes-version <上一版>`。
 > - **節點**:Managed Node Group 需另外用 `update-nodegroup-version` 個別降版;EKS Auto Mode 會自動一併處理。
 > - **例外**:不支援 Fargate 節點(需先手動刪除跑在目標降版本上的 Fargate Pod,否則會觸發 kubelet 版本偏移的 ERROR 提示);Addon 版本也**不會**自動跟著降版,需自行檢查相容性並視需要手動調整。
