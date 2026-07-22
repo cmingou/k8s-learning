@@ -440,7 +440,7 @@ func main() {
 > **現況補充**:K8s 社群也意識到此問題。
 >
 > - `kube-proxy` 的 **nftables 模式**已於 **1.33** 版 GA,用近似 `O(1)` 的映射結構解決了同樣的效能問題([Kubernetes 官方部落格:NFTables mode for kube-proxy](https://kubernetes.io/blog/2025/02/28/nftables-kube-proxy/));不過 iptables 目前仍是上游預設模式。
-> - IPVS 模式的棄用走**多版本漸進式**時程,依照官方 [KEP-5495](https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/5495-deprecate-ipvs-mode-in-kube-proxy):**1.35** 起印出棄用警告(功能仍完整可用)、**1.37** 引入 `KubeProxyIPVS` feature gate(預設 `true`)、**1.40** 預設翻成 `false`、**1.43** 才真正移除程式碼(`pkg/proxy/ipvs`)、**1.46** 清掉 feature gate。社群建議及早改用 nftables 以避免屆時被迫遷移。留意 AWS 的 [EKS 1.35 版本說明](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions-standard.html#kubernetes-1-35)一度寫著「will be removed in Kubernetes 1.36」,與上游時程不符——實際時程以上游 KEP-5495 追蹤進度為準。
+> - IPVS 模式的棄用走**多版本漸進式**時程,依照官方 [KEP-5495](https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/5495-deprecate-ipvs-mode-in-kube-proxy):**1.35** 起印出棄用警告(功能仍完整可用)、**1.37** 引入 `KubeProxyIPVS` feature gate(預設 `true`)、**1.40** 預設翻成 `false`、**1.43** 才真正移除程式碼(`pkg/proxy/ipvs`)、**1.46** 清掉 feature gate。社群建議及早改用 nftables 以避免屆時被迫遷移。留意 AWS 的 [EKS 1.35 版本說明](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions-standard.html#kubernetes-1-35)目前仍寫著「will be removed in Kubernetes 1.36」,與上游時程不符——實際時程以上游 KEP-5495 追蹤進度為準。
 > - 但 nftables/IPVS 都只解決了「Service 轉送」這一項問題,並未涵蓋 eBPF 在身分型網路策略、L7 可視性、無侵入式可觀測性上的能力——這正是 Cilium 等 eBPF 方案除了取代 kube-proxy 之外仍有價值的原因。
 
 ```mermaid

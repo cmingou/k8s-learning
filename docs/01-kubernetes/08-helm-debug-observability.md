@@ -28,6 +28,8 @@
 
 把 Helm 想成 K8s 世界的 `apt` 或 `npm`:你不會手刻一個資料庫的所有 YAML,而是 `helm install` 一個現成的**套件 (package)**。這個套件在 Helm 裡叫 **Chart**。
 
+> **版本提醒**:Helm 已於 2025 年 11 月發布大版本 **Helm 4**,取代進入維護期的 Helm 3;本章示範的核心指令(`install`/`upgrade`/`rollback`/`uninstall`/`template` 等)在兩個大版本間相容、行為不變([Helm 4 Overview](https://helm.sh/docs/overview/))。
+
 ### 2.1 三個核心概念:Chart / Values / Release
 
 | 概念 | 類比 | 是什麼 |
@@ -256,7 +258,7 @@ kubectl delete -k overlays/prod      # 對應的刪除
 
 **為什麼需要?** 第 2 章教你 `kubectl exec -it <pod> -- sh` 進容器除錯。但正式環境的映像為了縮小體積與攻擊面,常用 **distroless** 或 scratch 基底——**裡面根本沒有 shell、沒有 `curl`、沒有 `ps`**。`kubectl exec` 進不去,因為沒有 `sh` 可執行。
 
-解法是**臨時容器 (Ephemeral Container)**:在「已經在跑的 Pod」裡**臨時插入一個帶有除錯工具的容器**,它和目標容器共享同一個 Pod(共享網路、可看到彼此的行程),但不影響原容器。`kubectl debug` 就是做這件事的指令。
+解法是**臨時容器 (Ephemeral Container,自 [Kubernetes v1.25 起為 Stable/GA](https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/))**:在「已經在跑的 Pod」裡**臨時插入一個帶有除錯工具的容器**,它和目標容器共享同一個 Pod(共享網路、可看到彼此的行程),但不影響原容器。`kubectl debug` 就是做這件事的指令。
 
 ```bash
 # 在已存在的 Pod 裡注入一個臨時除錯容器(用滿載工具的映像)
