@@ -156,6 +156,8 @@ eBPF 程式要「綁」到某個事件來源才能被觸發。常見掛載點:
 > **kprobe vs tracepoint 怎麼選?** kprobe 能掛**任何**核心函式,彈性最大,但函式名稱可能隨核心版本改變(不穩定);tracepoint 是核心刻意提供的穩定介面,跨版本可靠,**優先用 tracepoint,沒有合適的再退而用 kprobe。**
 >
 > **XDP vs tc 怎麼選?** XDP 掛在驅動層、早於 `sk_buff` 配置,延遲最低、最適合「越早丟棄惡意/不需要的封包越好」的場景(如 DDoS 防護),但只能處理 ingress;tc 掛在網路堆疊內,雖然延遲略高,卻能看到完整封包中介資訊、可串接多個分類器、支援 egress,適合更複雜的策略控制。
+>
+> **tc 的現代附掛方式:tcx。** 傳統 tc BPF 程式要透過 netlink 掛在 `clsact` qdisc 上,多個程式共存時的執行順序與卸載時機不易管理。核心 **6.6** 引入的 **tcx**,提供以 `bpf_link` 為基礎的輕量多程式附掛機制:支援用 `BPF_F_BEFORE`/`BPF_F_AFTER` 明確指定執行順序、行程結束或 fd 關閉時自動卸載,不必再操作 qdisc。傳統 `tc`/`classifier`/`action` 附掛型態已被標示為過時,tcx 是目前建議的做法,Cilium 等專案已預設偵測核心支援後改用 tcx。詳見 [eBPF Docs:BPF_PROG_TYPE_SCHED_CLS](https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_SCHED_CLS/)。
 
 > **動手練習 2**:畫出「一個封包從網卡到應用程式」的路徑,並標出 XDP 與 tc 分別攔截在哪一段。思考:為什麼 DDoS 防護要用 XDP 而不是 tc?(提示:越早丟棄惡意封包,浪費的 CPU 越少。)
 
