@@ -792,7 +792,7 @@ flowchart LR
 eksctl create cluster \
   --name my-auto-eks \
   --region ap-northeast-1 \
-  --version 1.33 \
+  --version 1.34 \               # 版本號請以官方「目前標準支援版本」清單為準,見 2.2 節說明
   --auto-mode
 ```
 
@@ -806,7 +806,7 @@ kind: ClusterConfig
 metadata:
   name: my-auto-eks
   region: ap-northeast-1
-  version: "1.33"
+  version: "1.34"   # 建立前請查當下標準支援版本清單(見 2.2 節說明)
 
 autoModeConfig:
   enabled: true
