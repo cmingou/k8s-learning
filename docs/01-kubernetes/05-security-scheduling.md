@@ -368,6 +368,32 @@ spec:
 | `minAvailable: "50%"` | 存活 Pod 不能少於當前副本數的 50% | 副本數隨 HPA 變動,百分比更彈性 |
 | `maxUnavailable: 1` | 一次最多允許 1 個 Pod 同時不可用 | 想直接控制中斷速度 |
 
+#### 邊角案例:不健康的 Pod 會擋住 drain 嗎?(`unhealthyPodEvictionPolicy`)
+
+預設策略 `IfHealthyBudget` 對「不健康(Running 但尚未 Ready)」的 Pod 一樣保守:只有在**驅逐後存活的健康 Pod 數仍 ≥ 門檻**時才准驅逐。這會導致一個常見痛點——如果整組副本都卡在 `CrashLoopBackOff` 之類的不健康狀態,`kubectl drain` 會被這些「本來就不健康」的 Pod 卡住,節點遲遲清不空。
+
+`spec.unhealthyPodEvictionPolicy` 提供第二種策略可解這個問題:
+
+| 值 | 行為 |
+|----|------|
+| `IfHealthyBudget`(預設) | 不健康 Pod 也要等「驅逐後仍不違反 minAvailable」才准驅逐 |
+| `AlwaysAllow` | 不健康 Pod **一律**可驅逐,不受 PDB 門檻限制(最佳努力可用性) |
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-pdb
+spec:
+  selector:
+    matchLabels:
+      app: web
+  minAvailable: 2
+  unhealthyPodEvictionPolicy: AlwaysAllow   # 讓不健康 Pod 不擋節點維護/drain
+```
+
+> 官方文件建議:為了讓節點 drain 時能順利驅逐行為異常的應用,建議設定 `AlwaysAllow`([Disruptions 官方文件 — Unhealthy Pod Eviction Policy](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#unhealthy-pod-eviction-policy))。這個欄位 **v1.26 alpha、v1.27 beta(預設開啟)、v1.28 起 GA**([Kubernetes 1.26 官方部落格公告](https://kubernetes.io/blog/2023/01/06/unhealthy-pod-eviction-policy-for-pdbs/))。
+
 #### kubectl drain 如何與 PDB 互動
 
 ```bash
