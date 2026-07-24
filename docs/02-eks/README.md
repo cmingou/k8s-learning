@@ -792,7 +792,7 @@ flowchart LR
 eksctl create cluster \
   --name my-auto-eks \
   --region ap-northeast-1 \
-  --version 1.33 \
+  --version 1.34 \
   --auto-mode
 ```
 
@@ -806,7 +806,7 @@ kind: ClusterConfig
 metadata:
   name: my-auto-eks
   region: ap-northeast-1
-  version: "1.33"
+  version: "1.34"
 
 autoModeConfig:
   enabled: true
