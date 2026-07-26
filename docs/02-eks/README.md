@@ -839,12 +839,14 @@ EKS Auto Mode 費用 = EC2 費用 + 節點管理費用。附加費依機型固�
 
 | 費用項目 | 計費方式 |
 |---|---|
-| EC2 On-Demand 節點 | EC2 原價 **+ 約 12% 附加費**(AWS 代管節點生命週期費) |
-| EC2 Spot 節點 | Spot 原價 **+ 相同的附加費**(總價較低只是因為 Spot 的 EC2 底價較低) |
+| EC2 On-Demand 一般型節點 | EC2 原價 **+ 約 12% 附加費**(AWS 代管節點生命週期費) |
+| EC2 Spot 一般型節點 | Spot 原價 **+ 相同的附加費**(總價較低只是因為 Spot 的 EC2 底價較低) |
+| GPU / 加速運算節點(G 系列) | EC2 原價 + 附加費,**自 2026 年 7 月 1 日起調降約 35%** |
+| GPU / 加速運算節點(P 系列、AWS Trainium) | EC2 原價 + 附加費,**自 2026 年 7 月 1 日起調降約 60%** |
 | EKS Control Plane | 同標準 EKS(約 $0.10/hr/叢集) |
 | 核心外掛(VPC CNI 等) | 不另收 Addon 費用(已含在附加費內) |
 
-> 成本判斷:**12% 的附加費換來不需要工程師手動管理 Karpenter 設定、Addon 升級、節點輪替 SOP**。對小型 / 中型團隊通常划算;對成本極度敏感且已有成熟 Karpenter 設定的大型艦隊,繼續使用標準 EKS + Karpenter 可能更省錢。
+> 成本判斷:**一般型節點約 12% 的附加費換來不需要工程師手動管理 Karpenter 設定、Addon 升級、節點輪替 SOP**。對小型 / 中型團隊通常划算;對成本極度敏感且已有成熟 Karpenter 設定的大型艦隊,繼續使用標準 EKS + Karpenter 可能更省錢。GPU / 加速運算機型的附加費已於 2026 年 7 月大幅調降(G 系列降約 35%、P 系列與 Trainium 降約 60%),讓 Auto Mode 跑 AI/ML 工作負載的溢價明顯降低,詳見〈[Amazon EKS Auto Mode reduces prices for GPU and accelerated instances](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-auto-mode-gpu-price/)〉。
 
 #### 何時選 EKS Auto Mode
 
