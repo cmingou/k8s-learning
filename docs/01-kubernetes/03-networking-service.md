@@ -293,7 +293,7 @@ flowchart LR
 ### 5.1 重要區分:Ingress 物件 vs Ingress Controller
 
 - **Ingress 物件**:你寫的 YAML,只是一份「路由規則的宣告」。
-- **Ingress Controller**:真正讀這份規則、執行反向代理的程式(例如 ingress-nginx、Traefik)。**叢集預設沒有 Controller,你得自己裝。** 官方文件明確指出:「只建立 Ingress 資源本身沒有任何效果」,必須搭配 Ingress Controller 才會生效([Ingress 官方文件](https://kubernetes.io/docs/concepts/services-networking/ingress/#ingress-controllers))。
+- **Ingress Controller**:真正讀這份規則、執行反向代理的程式(例如 ingress-nginx、Traefik)。**叢集預設沒有 Controller,你得自己裝。** 官方文件明確指出:「只建立 Ingress 資源本身沒有任何效果」,必須搭配 Ingress Controller 才會生效([Ingress 官方文件](https://kubernetes.io/docs/concepts/services-networking/ingress/#prerequisites))。
 
 ```bash
 # minikube:啟用內建 ingress-nginx(僅供教學實驗,正式環境請見下方退役公告)
