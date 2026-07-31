@@ -28,6 +28,8 @@
 
 把 Helm 想成 K8s 世界的 `apt` 或 `npm`:你不會手刻一個資料庫的所有 YAML,而是 `helm install` 一個現成的**套件 (package)**。這個套件在 Helm 裡叫 **Chart**。
 
+> **版本現況**:[Helm v4.0.0 已於 2025-11-12 GA](https://helm.sh/blog/helm-4-released/),是目前的主線大版本(截至 2026-07 最新為 v4.2.3);v3 仍平行維護修補版(v3.21.3)供尚未遷移的使用者過渡。本章示範的指令(`install`/`upgrade`/`rollback`/`template`/`repo`)在 v3、v4 皆可直接使用,行為未變;v4 的破壞性變更集中在少數旗標改名(如 `--atomic` → `--rollback-on-failure`)與外掛式 post-renderer 等進階用法,不影響本章內容。
+
 ### 2.1 三個核心概念:Chart / Values / Release
 
 | 概念 | 類比 | 是什麼 |
