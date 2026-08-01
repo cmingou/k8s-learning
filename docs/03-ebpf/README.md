@@ -134,10 +134,12 @@ eBPF 程式本身是**無狀態、短命**的——每次事件觸發、跑完�
 5. **指令數量與複雜度受限**:避免拖垮核心。核心 **5.2** 之前硬上限是 **4096 條指令**且複雜度上限 128K;5.2 之後的變更**只放寬了特權 (root) 程式**——複雜度上限改為單純的 `BPF_COMPLEXITY_LIMIT_INSNS`,約 **100 萬條指令**等級,此時純粹看驗證器能否在合理時間內窮舉完所有路徑。但**非特權程式的 4096 條指令上限至今仍然存在**,並未被移除(見 [Linux 核心文件:BPF Design Q&A](https://docs.kernel.org/bpf/bpf_design_QA.html) 中「BPF_MAXINSNS (4096)... the maximum number of instructions that the unprivileged bpf program can have」;變更歷史見 [Linux 核心 commit:bpf: increase complexity limit and maximum program size](https://github.com/torvalds/linux/commit/c04c0d2b968ac45d6ef020316808ef6c82325a82))。
 
 > 心法:**驗證器不是你的敵人,是你的安全帶。** 初學時被它擋下會很挫折,但它擋下的每一個錯誤,在傳統核心模組裡都可能是一次 Kernel Panic。
+>
+> **但安全帶也會有瑕疵**:驗證器本身是複雜的靜態分析程式碼,一樣可能出錯。例如 **CVE-2026-31413** 就是驗證器對 `BPF_OR` 常數運算元的純量分析錯誤(`maybe_fork_scalars()` 誤用了 `BPF_AND` 的推導邏輯),導致驗證器認定的值與執行期實際值不一致,可被利用做越界的 map 存取(CVSS 7.8;[CVE 官方記錄(NVD)](https://nvd.nist.gov/vuln/detail/CVE-2026-31413)、[核心修補 commit](https://git.kernel.org/stable/c/342aa1ee995ef5bbf876096dc3a5e51218d76fa4))。這類問題通常需要載入非特權 eBPF 程式的能力才能觸發,也是許多 K8s 節點預設**停用非特權 BPF**(`kernel.unprivileged_bpf_disabled=1`,見 [核心文件:BPF Design Q&A](https://docs.kernel.org/bpf/bpf_design_QA.html))或限制 `CAP_BPF` 授予對象的原因。
 
 ### 2.5 JIT 編譯:跑得跟原生一樣快
 
-通過驗證後,**JIT (Just-In-Time) 編譯器** 會把與架構無關的 eBPF 位元組碼,翻譯成當下 CPU 的**原生機器碼 (Native Machine Code)**。eBPF 的暫存器與指令格式刻意設計成與現代 CPU(x86-64、ARM64 等)的暫存器/呼叫慣例相近,讓 JIT 多半能做到指令一對一映射,目前官方支援 x86-64、arm64、arm32、ppc64、s390x、mips64、sparc64、riscv64/riscv32、loongarch64 等架構(核心原始碼各架構下的 `bpf_jit_comp.c` 為權威來源;概念說明見[核心文件:Classic BPF vs eBPF](https://docs.kernel.org/bpf/classic_vs_extended.html))。所以 eBPF 程式雖然是「動態載入的腳本」,執行效能卻**接近原生編譯的核心程式碼**,沒有直譯器的開銷。
+通過驗證後,**JIT (Just-In-Time) 編譯器** 會把與架構無關的 eBPF 位元組碼,翻譯成當下 CPU 的**原生機器碼 (Native Machine Code)**。eBPF 的暫存器與指令格式刻意設計成與現代 CPU(x86-64、ARM64 等)的暫存器/呼叫慣例相近,讓 JIT 多半能做到指令一對一映射,目前官方支援 x86-64、arm64、arm32、ppc64、s390x、mips64、sparc64、riscv64/riscv32、loongarch64、parisc(32/64 位元,核心 **6.6** 起新增)等架構(核心原始碼各架構下的 `bpf_jit_comp*.c` 為權威來源,如 [`arch/parisc/net/`](https://github.com/torvalds/linux/tree/master/arch/parisc/net);概念說明見[核心文件:Classic BPF vs eBPF](https://docs.kernel.org/bpf/classic_vs_extended.html))。所以 eBPF 程式雖然是「動態載入的腳本」,執行效能卻**接近原生編譯的核心程式碼**,沒有直譯器的開銷。
 
 ### 2.6 掛載點 (Hook Points):程式掛在哪裡
 
@@ -469,6 +471,8 @@ eBPF 用**雜湊表 (Hash Map)** 做查找,複雜度從 `O(n)` 降到接近 `O(1
 
 **Hubble** 是 Cilium 的可觀測性元件,讓你即時看到「哪個 Pod 跟哪個 Pod 講話、用什麼協定、有沒有被策略擋下」——服務地圖一目了然。
 
+> **版本現況**:[Cilium 1.20.0](https://github.com/cilium/cilium/releases/tag/v1.20.0) 已於 2026 年 7 月發布(超過 2,660 個 commit),Gateway API 支援由 v1.4 提升到 **v1.6.1**(對應本教材第 1 章 5.3 節談到的 TCPRoute/UDPRoute GA),並支援 Kubernetes v1.36。升級前請注意官方列出的重大變更項目(legacy Mutual Authentication、Envoy Go extensions、`cilium.io/v2alpha1 CiliumNodeConfig` 等)。
+
 ```bash
 # 用 Helm 安裝 Cilium 並啟用「取代 kube-proxy」模式(概念示意)
 helm install cilium cilium/cilium --namespace kube-system \
@@ -513,7 +517,13 @@ eBPF 的功能與核心版本**強相關**。各功能登場的大致里程碑(�
 | **5.7** | [BPF LSM](https://docs.kernel.org/bpf/prog_lsm.html) 引入 |
 | **5.8** | `CAP_BPF` / `CAP_PERFMON` 權限拆分、[Ring Buffer 映射](https://docs.kernel.org/bpf/ringbuf.html) 引入 |
 
-**實務建議:做 CO-RE 與現代開發,以核心 **5.4+**(理想 5.8+)且**啟用 BTF**(`CONFIG_DEBUG_INFO_BTF=y`)為基準。**
+**實務建議:做 CO-RE 與現代開發,以核心 **5.4+**(理想 5.8+)且**啟用 BTF**(`CONFIG_DEBUG_INFO_BTF=y`)為基準。**(截至 2026 年中,主線核心已進入 **7.x** 系列——[Linux 7.0 於 2026 年 4 月發布](https://kernelnewbies.org/Linux_7.0);上述 5.4+/5.8+ 只是「CO-RE 可用」的**最低**基準,新專案沒有理由不用更新的 LTS 核心。)
+
+> **近期已知的 eBPF 相關核心安全公告**(提醒:eBPF 的攻擊面包含驗證器、maps、helper 三處,以下各對應一處):
+> - **[CVE-2026-64036](https://nvd.nist.gov/vuln/detail/CVE-2026-64036)**(CVSS 7.8):`css_rstat_updated()` 這個 BPF kfunc 沒有驗證呼叫端傳入的 CPU 編號合法性,持有 `CAP_BPF` + `CAP_PERFMON` 即可觸發越界的 per-CPU 記憶體存取;已在 6.18.34 / 7.0.11 / 7.1 等版本修補。這正是 6.2 節「`CAP_BPF` 拆分權限」立意雖好,但拆出的能力組合仍可能被濫用的實例。
+> - **[CVE-2026-64192](https://nvd.nist.gov/vuln/detail/CVE-2026-64192)**:在 `CONFIG_BPF_LSM=y` 但 BPF LSM 未於開機時初始化的系統上,建立 `BPF_MAP_TYPE_INODE_STORAGE` map 會讓 inode 安全 blob 的偏移量停留在錯誤的預設值,導致記憶體別名進而破壞 RCU 回呼指標,清理階段觸發 Kernel Panic;修補後改為在建立當下直接拒絕該 map 類型(影響 5.10 至 7.1.4,修補見 7.2-rc2 起)。
+>
+> 這兩個案例的教育意義:**eBPF 的「安全」是核心持續攻防的動態結果,不是一次性保證**——生產環境務必訂閱 [Linux 核心官方 CVE 公告(linux-cve-announce 郵件論壇)](https://docs.kernel.org/process/cve.html) 或發行版的安全公告,並優先選用仍在收到安全更新的 LTS 核心。
 
 ```bash
 # 檢查核心版本

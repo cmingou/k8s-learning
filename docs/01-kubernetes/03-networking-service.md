@@ -364,7 +364,7 @@ spec:
 > - [Gateway API v1.6.0 Release Notes](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.0)
 > - [官方文件:TCPRoute 狀態](https://gateway-api.sigs.k8s.io/reference/api-types/tcproute/) / [UDPRoute 狀態](https://gateway-api.sigs.k8s.io/reference/api-types/udproute/)
 >
-> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;v1.5(2026 年 4 月)新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel,ReferenceGrant 也在此版由 `v1beta1` 升為 `v1`;截至 2026 年中最新為 **v1.6.0**(2026 年 6 月),讓 **UDPRoute / TCPRoute 晉升為 GA(`v1` API,取代舊版 `v1alpha2`)**。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.6 下皆維持穩定、可直接使用。
+> **版本進度補充**:API 持續演進中,v1.1(2024 年 5 月)把 GRPCRoute 晉升為 Standard Channel 穩定版;v1.5(2026 年 4 月)新增 `ListenerSet`、`TLSRoute`、CORS filter、client cert 驗證等能力晉升為 Standard Channel,ReferenceGrant 也在此版由 `v1beta1` 升為 `v1`;截至 2026 年中最新為 **v1.6.0**(2026 年 6 月,讓 **UDPRoute / TCPRoute 晉升為 GA**〔`v1` API,取代舊版 `v1alpha2`〕),隨後於 2026 年 7 月釋出**修補版 v1.6.1**(僅修正測試 flaky 問題,不含新 API 變動)。本節示範的 GatewayClass / Gateway / HTTPRoute / GRPCRoute / ReferenceGrant 在 v1.6 下皆維持穩定、可直接使用。
 
 #### 為什麼 Ingress 不夠用?
 
@@ -571,7 +571,7 @@ spec:
 | **Envoy Gateway** | CNCF 專案,以 Envoy 為底層 |
 | **Contour** | VMware 維護,以 Envoy 為底層 |
 | **Traefik** | 支援 Gateway API(v3+) |
-| **AWS Load Balancer Controller** | EKS 官方實作;v3.0.0(2026 GA)起**原生**支援 Gateway API,以 CRD 設定(L7 → ALB、L4 → NLB),不再靠 annotation([AWS 官方公告](https://aws.amazon.com/blogs/networking-and-content-delivery/aws-load-balancer-controller-adds-general-availability-support-for-kubernetes-gateway-api/)) |
+| **AWS Load Balancer Controller** | EKS 官方實作;[AWS 官方公告(2026 年 3 月)](https://aws.amazon.com/blogs/networking-and-content-delivery/aws-load-balancer-controller-adds-general-availability-support-for-kubernetes-gateway-api/)宣布 GA 支援 Gateway API,以 CRD 設定(L7 → ALB、L4 → NLB),不再靠 annotation(公告本文未直接標註版本號,對應到 controller 專案的 v3.0.0 發行版) |
 
 > **實務建議**:新叢集**優先評估 Gateway API**;現有叢集的 Ingress **API 不需要立刻遷移**(Ingress API 不會被棄用),但若你的 controller 是 ingress-nginx,因專案已退役仍需規劃遷移(見 5.1 節公告),且新功能只會出現在 Gateway API 上。
 

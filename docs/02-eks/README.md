@@ -307,7 +307,7 @@ aws eks associate-access-policy \
 
 **原理:OIDC + ServiceAccount Token**(詳見官方〈[IAM roles for service accounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)〉)
 
-1. EKS 叢集會有一個 **OIDC 提供者 (OIDC Provider)** 的 URL。
+1. EKS 叢集會有一個 **OIDC 提供者 (OIDC Provider)** 的 URL。(2026 年 7 月起,這個 OIDC discovery / JWKS 端點也支援 **[AWS PrivateLink](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-oidc-endpoint-privatelink/)**:可在 VPC 內建立 `com.amazonaws.<region>.oidc-eks` 介面端點,讓 eksctl / Terraform / 自製 token 驗證器等工具在沒有對外網路的 VPC 中也能私下解析與驗證 IRSA token,不必額外收費。)
 2. 你在 IAM 建立一個角色,它的「信任政策 (Trust Policy)」寫明:**「我信任這個叢集的 OIDC,而且只信任 `namespace:serviceaccount` 是某某的請求」**。
 3. 當 Pod 啟動,K8s 會把一個「**有時效的 OIDC Token**(Projected ServiceAccount Token)」掛載進 Pod。
 4. AWS SDK 自動拿這個 Token 去 STS `AssumeRoleWithWebIdentity`,換到一組**臨時、會自動輪替**的 AWS 憑證。
@@ -844,7 +844,9 @@ EKS Auto Mode 費用 = EC2 費用 + 節點管理費用。附加費依機型固�
 | EKS Control Plane | 同標準 EKS(約 $0.10/hr/叢集) |
 | 核心外掛(VPC CNI 等) | 不另收 Addon 費用(已含在附加費內) |
 
-> 成本判斷:**12% 的附加費換來不需要工程師手動管理 Karpenter 設定、Addon 升級、節點輪替 SOP**。對小型 / 中型團隊通常划算;對成本極度敏感且已有成熟 Karpenter 設定的大型艦隊,繼續使用標準 EKS + Karpenter 可能更省錢。
+> 成本判斷:官方定價頁只列各機型的實際費率,並未直接寫死「12%」這個數字——這是社群依定價頁反推出的常見估算,可作為量級參考,但實際折扣率會因機型而異,規劃預算前建議直接查[官方定價頁](https://aws.amazon.com/eks/pricing/)核對目標機型的費率。整體來說:**附加費換來不需要工程師手動管理 Karpenter 設定、Addon 升級、節點輪替 SOP**,對小型 / 中型團隊通常划算;對成本極度敏感且已有成熟 Karpenter 設定的大型艦隊,繼續使用標準 EKS + Karpenter 可能更省錢。
+>
+> **GPU / 加速運算機型調降(2026 年 7 月起)**:AWS 已將 Auto Mode 的 GPU 管理費調降——G 系列機型降 **35%**、P 系列與 AWS Trainium 機型降 **60%**,自動套用到所有既有與新建的 Auto Mode 叢集,不需任何操作([AWS 官方公告](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-auto-mode-gpu-price/))。這讓 Auto Mode 對 GPU 推論 / 訓練工作負載的成本劣勢明顯縮小。
 
 #### 何時選 EKS Auto Mode
 
@@ -864,7 +866,7 @@ EKS Auto Mode 費用 = EC2 費用 + 節點管理費用。附加費依機型固�
 | AMI 類型 | 說明 |
 |---|---|
 | **[Amazon Linux 2023 (AL2023)](https://docs.aws.amazon.com/eks/latest/userguide/eks-optimized-ami.html)** | **目前的預設值**:1.30 以後新建的 Managed Node Group 自動使用 AL2023;比 AL2 更安全(預設啟用 IMDSv2、SELinux permissive 模式) |
-| Amazon Linux 2 (AL2) | **舊版,已停止發布新 AMI**:EKS 已於 2025 年 11 月起停止發布新的 AL2 最佳化 AMI,`1.32` 是最後支援 AL2 的版本,`1.33` 以後僅提供 AL2023 / Bottlerocket |
+| Amazon Linux 2 (AL2) | **舊版,已停止發布新 AMI**:EKS 已於 2025 年 11 月 26 日起停止發布新的 AL2 最佳化 AMI,`1.32` 是最後支援 AL2 的版本,`1.33` 以後僅提供 AL2023 / Bottlerocket。注意這與 **AL2 作業系統本身**的官方支援終止(End of Support,2026 年 6 月 30 日)是兩件不同的事:前者是 EKS 停止「發布新 AMI」,後者是 AL2 整個發行版不再收到安全更新——兩者疊加後,現在無論是否用 EKS,都不建議再新建 AL2 節點 |
 | **Bottlerocket** | AWS 開發的容器專用最小化作業系統,攻擊面更小,EKS Auto Mode 節點即使用 Bottlerocket 變體 |
 
 > 若你的既有 node group 還在用 AL2,建議規劃遷移到 AL2023;若叢集未來要升到 `1.33` 以上,AL2 將不再有官方 AMI 可用。詳見官方〈[Guide to EKS AL2 & AL2-Accelerated AMIs transition](https://docs.aws.amazon.com/eks/latest/userguide/eks-ami-deprecation-faqs.html)〉。
