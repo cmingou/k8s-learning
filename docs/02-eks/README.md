@@ -124,7 +124,7 @@ eksctl create cluster \
   --managed                       # 使用 Managed Node Group(推薦)
 ```
 
-> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,之後預設自動進入 **12 個月延伸支援 (Extended Support,需額外付費)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本約落在 `1.34` ~ `1.36` 區間(`1.33` 已於 2026-07-29 結束標準支援、進入延伸支援),建議建立新叢集前先用 `aws eks describe-cluster-versions` 查當下的標準支援清單,而不要照抄教材裡的版本號。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
+> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,之後預設自動進入 **12 個月延伸支援 (Extended Support,需額外付費)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本約落在 `1.34` ~ `1.36` 區間;官方 release calendar 標示 `1.33` 已於 2026-07-29 到期,但查證當下 AWS 官方頁面的標準支援版本清單與 1.33 release notes 仍將其列在標準支援內、尚未見延伸支援頁面異動,顯示文件可能有更新延遲——建議建立新叢集前先用 `aws eks describe-cluster-versions` 查當下實際的標準支援清單,而不要照抄教材裡的版本號或 calendar 表的到期日。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
 
 > 這個指令通常要跑 **15~20 分鐘**(它在背後用 CloudFormation 建一堆資源)。完成後 eksctl 會自動幫你寫好 `~/.kube/config`。
 
@@ -792,7 +792,7 @@ flowchart LR
 eksctl create cluster \
   --name my-auto-eks \
   --region ap-northeast-1 \
-  --version 1.34 \
+  --version 1.34 \                # K8s 版本(請以官方「目前標準支援版本」清單為準,見 2.2 節說明)
   --auto-mode
 ```
 
@@ -806,7 +806,7 @@ kind: ClusterConfig
 metadata:
   name: my-auto-eks
   region: ap-northeast-1
-  version: "1.34"
+  version: "1.34"   # 建立前請查當下標準支援版本清單(見 2.2 節說明)
 
 autoModeConfig:
   enabled: true
@@ -901,7 +901,7 @@ eksctl create addon --name amazon-cloudwatch-observability --cluster my-first-ek
 
 EKS 升級分兩步,**順序很重要**(詳見官方〈[Update existing cluster to new Kubernetes version](https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html)〉):
 
-1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.33 → 1.34,不能跳版)。
+1. **先升 Control Plane**:`eksctl upgrade cluster --name ... --version <目標版本> --approve`(**一次只能升一個小版本**,例如 1.34 → 1.35,不能跳版)。
 2. **再升 Node Group / 外掛**:讓節點的 kubelet 版本追上,並升級 VPC CNI、CoreDNS、kube-proxy 等 Addon。
 
 > **新功能(2026 年 7 月起):版本降版 (Version Rollback)**。EKS 現已支援把控制平面**降回上一個小版本**,不再像過去那樣「降版只能重建叢集」([AWS 公告](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-version-rollback/)、[官方文件](https://docs.aws.amazon.com/eks/latest/userguide/rollback-cluster.html))。

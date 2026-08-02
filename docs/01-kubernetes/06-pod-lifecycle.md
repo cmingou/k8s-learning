@@ -85,7 +85,7 @@ Containers:
 
 ### 2.2 CrashLoopBackOff 到底是什麼
 
-很多人以為 `CrashLoopBackOff` 是一種錯誤——**不是**,它是一種「**退避策略 (back-off)**」。容器一啟動就掛、kubelet 依 `restartPolicy` 想重啟它,但為了避免「死了又起、起了又死」狂燒資源,kubelet 採用**指數退避**:第一次馬上重啟,之後間隔 10s → 20s → 40s …… 預設最長到 **5 分鐘**封頂;可透過 kubelet 設定的 `crashLoopBackOff.maxContainerRestartPeriod` 欄位調整這個上限,此欄位由 **`KubeletCrashLoopBackOffMax`** feature gate 控制,已於 **v1.35 晉升 Beta 且預設啟用**([Kubernetes Feature Gates:KubeletCrashLoopBackOffMax](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/))。`CrashLoopBackOff` 就是「正在等下一次重試」這個等待狀態([官方文件](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#crashloopbackoff))。
+很多人以為 `CrashLoopBackOff` 是一種錯誤——**不是**,它是一種「**退避策略 (back-off)**」。容器一啟動就掛、kubelet 依 `restartPolicy` 想重啟它,但為了避免「死了又起、起了又死」狂燒資源,kubelet 採用**指數退避**:第一次馬上重啟,之後間隔 10s → 20s → 40s …… 預設最長到 **5 分鐘**封頂;可透過 kubelet 設定的 `crashLoopBackOff.maxContainerRestartPeriod` 欄位調整這個上限,此欄位由 **`KubeletCrashLoopBackOffMax`** feature gate 控制,已於 **v1.35 晉升 Beta 且預設啟用**([Kubernetes Feature Gates:KubeletCrashLoopBackOffMax](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/))。`CrashLoopBackOff` 就是「正在等下一次重試」這個等待狀態([官方文件](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts))。
 
 ```mermaid
 flowchart LR

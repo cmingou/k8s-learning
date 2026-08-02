@@ -213,7 +213,7 @@ spec:
 | **readinessProbe**(就緒) | 能接流量了嗎? | **從 Service Endpoints 移除**(不殺) | 暫時不可用時先停止導流(回想第 3 章) |
 | **startupProbe**(啟動) | 啟動完成了嗎? | 重啟容器 | 給慢啟動的程式緩衝,期間不跑 liveness |
 
-> 三種探針的語意與失敗行為見[官方文件 Container Probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#types-of-probe)。
+> 三種探針的語意與失敗行為見[官方文件 Container Probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes)。
 
 ```yaml
 spec:

@@ -62,7 +62,7 @@ flowchart TB
 
 關鍵心法:**所有從節點發出的流量都只打向 API Server,彼此不直接溝通。** API Server 是整個系統的中央交換機,etcd 是它背後唯一的真實資料來源 (source of truth)。這種「星狀、以 API Server 為樞紐」的設計讓系統好擴充、好除錯——你要追任何問題,看 API Server 就對了。
 
-> 補充一個常見誤解:這個「樞紐」是單向為主,但不是絕對單向。**API Server 也會反過來主動連線 kubelet**,用於 `kubectl logs`、`kubectl exec`、port-forward 這類需要直連節點的操作,這條連線會終止在 kubelet 的 HTTPS 端點。詳見 [Communication between Nodes and the Control Plane](https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/#apiserver-to-kubelet)。
+> 補充一個常見誤解:這個「樞紐」是單向為主,但不是絕對單向。**API Server 也會反過來主動連線 kubelet**,用於 `kubectl logs`、`kubectl exec`、port-forward 這類需要直連節點的操作,這條連線會終止在 kubelet 的 HTTPS 端點。詳見 [Communication between Nodes and the Control Plane](https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/#api-server-to-kubelet)。
 
 ---
 
@@ -109,7 +109,7 @@ ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \
 
 > 一句話總結:etcd = 一個**強一致、可監看 (watchable)、用 Raft 複製**的鍵值資料庫,是整個叢集**唯一的真相來源 (source of truth)**。
 
-**Q2:為什麼 etcd 節點數要是奇數,而且常是 3 個?**(官方建議與容錯對照表見 [Operating etcd clusters for Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#example))
+**Q2:為什麼 etcd 節點數要是奇數,而且常是 3 個?**(官方建議見 [Operating etcd clusters for Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#multi-node-etcd-cluster);容錯數對照表出自該頁引用的 [etcd 官方 FAQ](https://etcd.io/docs/latest/faq/#what-is-failure-tolerance))
 
 核心觀念:Raft 任何決策(寫入、選 leader)都需要 **法定人數 (quorum),也就是「過半」**:
 
@@ -151,7 +151,7 @@ flowchart TB
     ODD --> NODD
 ```
 
-> **延伸回答(加分):** 那為什麼不乾脆放很多台?因為每筆寫入都要等「過半節點」確認落盤,**節點越多、寫入越慢**。所以實務上落在 **3 或 5** 這個甜蜜點,幾乎不會用到 7 台以上;官方文件甚至建議正式環境用 **5 節點**叢集以容忍 2 台同時故障([Operating etcd clusters for Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#example))。另外正式環境會把 etcd 節點**分散在不同可用區 (AZ)**,以容忍單一機房故障。
+> **延伸回答(加分):** 那為什麼不乾脆放很多台?因為每筆寫入都要等「過半節點」確認落盤,**節點越多、寫入越慢**。所以實務上落在 **3 或 5** 這個甜蜜點,幾乎不會用到 7 台以上;官方文件甚至建議正式環境用 **5 節點**叢集以容忍 2 台同時故障([Operating etcd clusters for Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#multi-node-etcd-cluster))。另外正式環境會把 etcd 節點**分散在不同可用區 (AZ)**,以容忍單一機房故障。
 
 ### 3.3 kube-scheduler — 決定 Pod 落在哪
 
