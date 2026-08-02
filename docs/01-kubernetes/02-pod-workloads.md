@@ -319,7 +319,7 @@ spec:
           command: ["./migrate.sh"]
 ```
 
-> `restartPolicy` 必須是 `Never` 或 `OnFailure`——因為 Job 的語意是「做完就停」,不能用會無限重啟的 `Always`([Job 官方文件](https://kubernetes.io/docs/concepts/workloads/controllers/job/#pod-backoff-failure-policy))。
+> `restartPolicy` 必須是 `Never` 或 `OnFailure`——因為 Job 的語意是「做完就停」,不能用會無限重啟的 `Always`([Job 官方文件 — Pod Template](https://kubernetes.io/docs/concepts/workloads/controllers/job/#pod-template))。
 
 ### 7.2 CronJob — 定時觸發 Job
 
