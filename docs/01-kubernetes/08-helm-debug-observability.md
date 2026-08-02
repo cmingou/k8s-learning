@@ -28,7 +28,7 @@
 
 把 Helm 想成 K8s 世界的 `apt` 或 `npm`:你不會手刻一個資料庫的所有 YAML,而是 `helm install` 一個現成的**套件 (package)**。這個套件在 Helm 裡叫 **Chart**。
 
-> **版本現況**:[Helm v4.0.0 已於 2025-11-12 GA](https://helm.sh/blog/helm-4-released/),是目前的主線大版本(截至 2026-07 最新為 v4.2.3);v3 仍平行維護修補版(v3.21.3)供尚未遷移的使用者過渡。本章示範的指令(`install`/`upgrade`/`rollback`/`template`/`repo`)在 v3、v4 皆可直接使用,行為未變;v4 的破壞性變更集中在少數旗標改名(如 `--atomic` → `--rollback-on-failure`)與外掛式 post-renderer 等進階用法,不影響本章內容。
+> **版本現況**:[Helm v4.0.0 已於 2025-11-12 GA](https://helm.sh/blog/helm-4-released/),是目前的主線大版本(截至 2026-07 最新為 v4.2.3);v3 仍平行維護修補版(v3.21.3)供尚未遷移的使用者過渡。本章示範的指令(`upgrade`/`rollback`/`template`/`repo`)在 v3、v4 皆可直接使用、行為未變;但 `helm install` 在 v4 預設改用 **server-side apply**(v3 預設是 client-side apply,既有 Helm 3 建立的 release 升級後仍沿用原本方式),另有少數旗標改名(如 `--atomic` → `--rollback-on-failure`)與外掛式 post-renderer 等進階變更,詳見 [Helm 4 Overview — Breaking Changes](https://helm.sh/docs/overview/#breaking-changes)。
 
 ### 2.1 三個核心概念:Chart / Values / Release
 
@@ -258,7 +258,7 @@ kubectl delete -k overlays/prod      # 對應的刪除
 
 **為什麼需要?** 第 2 章教你 `kubectl exec -it <pod> -- sh` 進容器除錯。但正式環境的映像為了縮小體積與攻擊面,常用 **distroless** 或 scratch 基底——**裡面根本沒有 shell、沒有 `curl`、沒有 `ps`**。`kubectl exec` 進不去,因為沒有 `sh` 可執行。
 
-解法是**臨時容器 (Ephemeral Container)**:在「已經在跑的 Pod」裡**臨時插入一個帶有除錯工具的容器**,它和目標容器共享同一個 Pod(共享網路、可看到彼此的行程),但不影響原容器。`kubectl debug` 就是做這件事的指令。
+解法是**臨時容器 (Ephemeral Container,自 [Kubernetes v1.25 起為 Stable/GA](https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/))**:在「已經在跑的 Pod」裡**臨時插入一個帶有除錯工具的容器**,它和目標容器共享同一個 Pod(共享網路、可看到彼此的行程),但不影響原容器。`kubectl debug` 就是做這件事的指令。
 
 ```bash
 # 在已存在的 Pod 裡注入一個臨時除錯容器(用滿載工具的映像)
