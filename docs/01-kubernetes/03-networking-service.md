@@ -65,7 +65,7 @@ kubectl describe svc web                 # Endpoints 欄位列出後端 IP
 
 ClusterIP 是個**虛擬 IP**,沒有任何網卡真的擁有它。是每台節點上的 **kube-proxy** 設定了封包轉發規則:當有封包要送到這個 ClusterIP,就攔截下來、(預設)隨機挑一個後端 Pod IP、改寫目的地。所以負載平衡其實發生在**每台節點的核心網路層**,不是某個集中的代理([Virtual IPs and Service Proxies](https://kubernetes.io/docs/reference/networking/virtual-ips/))。
 
-> **模式現況**:Linux 上預設模式是 iptables;`nftables` 模式已於 **v1.33** 晉升為穩定版,官方鼓勵在較新核心上嘗試([NFTables mode for kube-proxy](https://kubernetes.io/blog/2025/02/28/nftables-kube-proxy/));舊有的 `IPVS` 模式已於 **v1.35** 被標示為棄用 (deprecated)。
+> **模式現況**:Linux 上預設模式是 iptables;`nftables` 模式已於 **v1.33** 晉升為穩定版,官方鼓勵在較新核心上嘗試([NFTables mode for kube-proxy](https://kubernetes.io/blog/2025/02/28/nftables-kube-proxy/));舊有的 `IPVS` 模式已於 **v1.35** 依 [KEP-5495](https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/5495-deprecate-ipvs-mode-in-kube-proxy) 被標示為棄用 (deprecated)——這只是「多版本漸進式移除」時程的第一步,完整的棄用/移除排程(1.37 feature gate、1.43 才真正移除程式碼)見 [03-ebpf 章節「5. eBPF 與 Kubernetes」](../03-ebpf/README.md#5-ebpf-與-kubernetes)第 5.1 節的詳細考證。
 
 ---
 
