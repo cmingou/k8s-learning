@@ -113,7 +113,7 @@ spec:
 ```
 
 - **`readOnlyRootFilesystem: true`**:讓容器的根目錄 `/`(來自映像檔的那層,回想 [Linux 4](../00-prerequisites/01-linux-basics/04-namespaces-cgroups.md) 的 OverlayFS)**唯讀**。為什麼有用?攻擊者拿到 shell 後,常見手段是「下載工具、寫入二進位、改設定、放後門」——根檔案系統唯讀,這些**全部寫不進去**。代價是:應用如果真的要寫檔(暫存、log、快取),你得用 `emptyDir` 或 Volume 把那些路徑單獨掛成可寫(像上面的 `/tmp`)。這是一個非常划算的加固。
-- **`allowPrivilegeEscalation: false`**:禁止行程透過 SUID 程式(回想 [Linux 3](../00-prerequisites/01-linux-basics/03-users-permissions.md) 的 SUID:執行時以檔案擁有者身分跑)等手段「取得比啟動它的父行程更多的權限」。設成 `false` 後,核心會設定 [`no_new_privs` 旗標](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container),`sudo`、`su`、SUID 的 `ping` 這類提權路徑就被堵死。注意:若容器以 `privileged: true` 執行,或被加上 `CAP_SYS_ADMIN`,`allowPrivilegeEscalation` 實際上一律視為 `true`,無法靠這個欄位擋下。
+- **`allowPrivilegeEscalation: false`**:禁止行程透過 SUID 程式(回想 [Linux 3](../00-prerequisites/01-linux-basics/03-users-permissions.md) 的 SUID:執行時以檔案擁有者身分跑)等手段「取得比啟動它的父行程更多的權限」。設成 `false` 後,核心會設定 [`no_new_privs` 旗標](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/),`sudo`、`su`、SUID 的 `ping` 這類提權路徑就被堵死。注意:若容器以 `privileged: true` 執行,或被加上 `CAP_SYS_ADMIN`,`allowPrivilegeEscalation` 實際上一律視為 `true`,無法靠這個欄位擋下。
 
 > 💡 **為什麼這兩個常一起出現**:`runAsNonRoot` 讓你「一開始就不是 root」,但如果允許提權,攻擊者可能想辦法爬回 root;`allowPrivilegeEscalation: false` 把這條爬升路徑封死。兩者搭配,才是完整的「降權且鎖死」。
 

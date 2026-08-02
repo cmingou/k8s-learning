@@ -324,7 +324,7 @@ flowchart LR
 | **跑完就退場** | 成功後就終止,**不會**和主容器一起常駐 | 它只做「一次性準備」,不是服務 |
 | **看 Pod 階段** | init 期間 Pod 仍是 **Pending**,容器狀態顯示 `Init:0/2` 之類 | 對應第 1 節:還沒有主容器在跑 |
 
-> 上述規則出自[官方文件 Init Containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior):「the kubelet repeatedly restarts that init container until it succeeds」,例外是 `restartPolicy: Never` 時不重試、直接判定 Pod 失敗。
+> 上述規則出自[官方文件 Init Containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#understanding-init-containers):「the kubelet repeatedly restarts that init container until it succeeds」,例外是 `restartPolicy: Never` 時不重試、直接判定 Pod 失敗。
 
 ### 6.2 init 容器 vs 主容器
 

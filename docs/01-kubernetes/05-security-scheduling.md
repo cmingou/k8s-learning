@@ -278,7 +278,7 @@ kubectl top pods                 # 確認能看到 CPU/記憶體用量(代表 me
 kubectl get hpa -w               # 觀察副本數隨負載變化
 ```
 
-> **前提**:HPA 的 CPU 百分比是相對於 **requests** 算的,所以**容器一定要設 requests**,否則該 Pod 的 CPU 使用率「未定義」,HPA 不會針對這個指標採取任何擴縮動作(見[官方文件](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#algorithm-details))。這把第 5 節與這節串起來了。
+> **前提**:HPA 的 CPU 百分比是相對於 **requests** 算的,所以**容器一定要設 requests**,否則該 Pod 的 CPU 使用率「未定義」,HPA 不會針對這個指標採取任何擴縮動作(見[官方文件](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/#algorithm-details))。這把第 5 節與這節串起來了。
 >
 > 補充:HPA 改「Pod 數量」(水平);VPA 改「單一 Pod 的 requests/limits」(垂直);Cluster Autoscaler 改「節點數量」。三者解決不同層級。
 
