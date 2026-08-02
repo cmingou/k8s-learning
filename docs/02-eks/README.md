@@ -124,7 +124,7 @@ eksctl create cluster \
   --managed                       # 使用 Managed Node Group(推薦)
 ```
 
-> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,之後預設自動進入 **12 個月延伸支援 (Extended Support,需額外付費)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本約落在 `1.34` ~ `1.36` 區間;官方 release calendar 標示 `1.33` 已於 2026-07-29 到期,但查證當下 AWS 官方頁面的標準支援版本清單與 1.33 release notes 仍將其列在標準支援內、尚未見延伸支援頁面異動,顯示文件可能有更新延遲——建議建立新叢集前先用 `aws eks describe-cluster-versions` 查當下實際的標準支援清單,而不要照抄教材裡的版本號或 calendar 表的到期日。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
+> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,之後預設自動進入 **12 個月延伸支援 (Extended Support,需額外付費)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本約落在 `1.34` ~ `1.36` 區間(EKS 與 EKS Distro 已於 [2026-06 公告支援 Kubernetes 1.36](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-eks-distro-kubernetes-version-1-36/));官方 release calendar 標示 `1.33` 已於 2026-07-29 到期,但查證當下 AWS 官方頁面的標準支援版本清單與 1.33 release notes 仍將其列在標準支援內、尚未見延伸支援頁面異動,顯示文件可能有更新延遲——建議建立新叢集前先用 `aws eks describe-cluster-versions` 查當下實際的標準支援清單,而不要照抄教材裡的版本號或 calendar 表的到期日,這個區間會持續往上滾動。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
 
 > 這個指令通常要跑 **15~20 分鐘**(它在背後用 CloudFormation 建一堆資源)。完成後 eksctl 會自動幫你寫好 `~/.kube/config`。
 
@@ -871,6 +871,44 @@ EKS Auto Mode 費用 = EC2 費用 + 節點管理費用。附加費依機型固�
 
 > 若你的既有 node group 還在用 AL2,建議規劃遷移到 AL2023;若叢集未來要升到 `1.33` 以上,AL2 將不再有官方 AMI 可用。詳見官方〈[Guide to EKS AL2 & AL2-Accelerated AMIs transition](https://docs.aws.amazon.com/eks/latest/userguide/eks-ami-deprecation-faqs.html)〉。
 
+### 7.5 節點池新能力:EFA 與 Placement Group(2026-07 新功能)
+
+> **來源**:[AWS 官方公告(2026-07-22)](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-efa-placement-groups/)
+
+EKS 在 **EKS Auto Mode** 與開源 **Karpenter** 的節點池設定裡,新增了兩項可直接宣告的能力,鎖定分散式訓練 (distributed training) / 推論 (inference) 這類需要多節點高頻寬互聯的工作負載:
+
+- **EFA (Elastic Fabric Adapter) 網路介面設定**:可把 EFA 能力機型上的網路介面設為「標準 ENI」或「EFA-only」。EFA-only 介面**不佔用 IP 位址**,同時保留完整頻寬,讓同一台實例能掛更多 EFA 裝置而不會被 IP 額度卡住。
+- **EC2 Placement Group**:可直接在節點池設定裡指定既有的 placement group,支援 `cluster`(叢集,追求最大頻寬)、`spread`(分散,提高可用性)、`partition`(分區,做故障隔離)三種策略,不必再靠手動 workaround 控制實例的實體擺放位置。
+
+```yaml
+# EKS Auto Mode NodeClass 範例(節錄):EFA-only 介面 + Placement Group
+# 完整欄位定義詳見官方文件 create-node-class.html#static-network-interfaces
+apiVersion: eks.amazonaws.com/v1
+kind: NodeClass
+metadata:
+  name: efa-training
+spec:
+  role: MyNodeRole
+  subnetSelectorTerms:
+    - tags:
+        Name: "private-subnet"
+  securityGroupSelectorTerms:
+    - tags:
+        Name: "efa-security-group"
+  placementGroupSelector:
+    name: "ml-training-pg"        # 既有的 EC2 Placement Group
+  advancedNetworking:
+    networkInterfaces:
+      - deviceIndex: 0
+        interfaceType: interface   # 主要 ENI 一定要是標準 interface
+        networkCardIndex: 0
+      - deviceIndex: 0
+        interfaceType: efa-only    # 額外掛的 EFA-only 介面,不佔 IP
+        networkCardIndex: 1
+```
+
+> 這兩項能力同時適用於 **EKS Auto Mode**(NodeClass,`eks.amazonaws.com/v1`)與開源 **Karpenter**(NodePool/EC2NodeClass,欄位命名與 apiVersion 略有差異),詳見官方文件:[Create a Node Class for Amazon EKS — Static Network Interface Configuration](https://docs.aws.amazon.com/eks/latest/userguide/create-node-class.html#static-network-interfaces)、[Karpenter NodeClasses — spec.networkInterfaces](https://karpenter.sh/docs/concepts/nodeclasses/#specnetworkinterfaces)。
+
 ### 動手練習 7
 
 1. 用 `eksctl create nodegroup` 額外加一個 Spot 機型的 Node Group,觀察 Spot 與 On-Demand 的價差。
@@ -1066,6 +1104,7 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我知道新的版本降版 (Version Rollback) 功能及其限制(7 天內、N-1、Fargate/Addon 例外,見 8.2 節)。
 - [ ] 我知道 Container Insights / Control Plane Logging 會產生費用。
 - [ ] 我知道目前 Managed Node Group 預設 AMI 是 AL2023,AL2 已停止發布新 AMI。
+- [ ] 我知道 EKS Auto Mode 與 Karpenter 節點池現在可直接宣告 EFA 網路介面與 EC2 Placement Group(cluster/spread/partition),適合分散式訓練/推論工作負載(見 7.5 節)。
 
 **成本與清理(保命)**
 - [ ] 我在練習前就設好了 AWS Budget 告警。

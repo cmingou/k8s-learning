@@ -374,6 +374,51 @@ Error from server (Forbidden): pods "bad-pod" is forbidden: violates PodSecurity
 
 > 結論:**新叢集一律用 PSA。** PSA 刻意做得「簡單但夠用」;若你需要 PSS 三級涵蓋不了的客製規則(例如「只准用公司私有 registry 的映像」),那是 **Kyverno / OPA Gatekeeper** 這類**政策引擎 (policy engine)** 的工作,屬於進階主題。
 
+### 9.5 Mutating Admission Policy:內建、CEL 為基礎的變異准入(v1.36 Stable)
+
+9.4 提到「更細的客製規則要靠 Kyverno / OPA Gatekeeper 這類政策引擎」——但那類工具與傳統的 **mutating admission webhook** 一樣,通常需要你自己寫、部署、維運一個**外部服務**(要處理 TLS 憑證、高可用,還可能成為叢集的單點故障)。
+
+**Mutating Admission Policy** 是 K8s 內建的替代方案:用 [CEL(Common Expression Language)](https://kubernetes.io/docs/reference/using-api/cel/) 宣告「怎麼修改資源」,規則直接在 API Server 行程內執行,不用另外寫、部署、維護一個 webhook server。此功能已於 [**v1.36 進入 Stable 並預設啟用**](https://kubernetes.io/docs/reference/access-authn-authz/mutating-admission-policy/),API 為 `admissionregistration.k8s.io/v1` 下的 `MutatingAdmissionPolicy` / `MutatingAdmissionPolicyBinding` 資源。
+
+```yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: "sidecar-policy.example.com"
+spec:
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: does-not-already-have-sidecar
+      expression: "!object.spec.initContainers.exists(ic, ic.name == \"mesh-proxy\")"
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  mutations:
+    - patchType: "ApplyConfiguration"
+      applyConfiguration:
+        expression: >
+          Object{
+            spec: Object.spec{
+              initContainers: [
+                Object.spec.initContainers{
+                  name: "mesh-proxy",
+                  image: "mesh/proxy:v1.0.0"
+                }
+              ]
+            }
+          }
+```
+
+上面這份 policy 還要再搭配一個 `MutatingAdmissionPolicyBinding`,把它綁到指定的物件範圍才會生效(綁定物件的完整寫法見官方文件)。
+
+> **跟 PSA 的分工**:PSA(9.1〜9.4)只能**擋**(enforce / warn / audit)不合格的 Pod,不能改內容;Mutating Admission Policy 用同一種「宣告式、CEL、內建於 API Server、不需外部 webhook」的路線,主動**修改**資源內容(補欄位、塞 sidecar、改預設值)。兩者都是把原本要靠外部服務(webhook / policy engine)才能做到的事,收斂進 K8s 內建的准入機制。
+
+📖 **官方文件**:[Mutating Admission Policy](https://kubernetes.io/docs/reference/access-authn-authz/mutating-admission-policy/)
+
 ---
 
 ## 第三部分:其他加固方向(點到為止)
@@ -458,6 +503,7 @@ flowchart LR
 - [ ] 能用 namespace 標籤 (`pod-security.kubernetes.io/enforce|warn|audit`) 套用 PSS,並理解三種模式行為
 - [ ] 能故意部署違規 Pod 驗證被 PSA 擋下,並讀懂錯誤訊息修正
 - [ ] 知道 PSA 取代了已移除的 PodSecurityPolicy (PSP),更細的需求改用 Kyverno / OPA Gatekeeper
+- [ ] 理解 Mutating Admission Policy 用 CEL、內建於 API Server 取代自架 mutating webhook 的作法,以及它與 PSA(只擋不改)的分工
 - [ ] 理解其他加固方向:user namespace、不自動掛 SA token、映像來源信任、最小基底映像
 - [ ] **能把「Linux 隔離 → 容器 → K8s securityContext → PSA」這條完整安全線講清楚**
 

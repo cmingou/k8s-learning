@@ -325,6 +325,43 @@ kubectl describe pod my-pod | grep -A5 "Requests:"
 
 📖 **官方文件**:[Resize CPU and Memory Resources assigned to Containers](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/)
 
+### 7.1.1 進階:Pod 層級資源的就地垂直擴縮(K8s 1.36 Beta)
+
+上面談的 In-Place Resize,改的都是**單一容器**的 `resources`。K8s 另外還有一條平行的演進路線,管的是**整個 Pod**的資源:
+
+> **版本時間軸**:Pod-Level Resources(在 `spec.resources` 這個 **Pod 層級**聚合欄位,設一個 Pod 整體共用的 CPU/記憶體預算)於 **v1.34 進入 Beta**;容器層級的 In-Place Resize 於 **v1.35 GA**(就是上面 7.1 講的內容)。v1.36 把兩條線接起來,推出 **In-Place Vertical Scaling for Pod-Level Resources**,讓這個 Pod 層級的聚合資源預算也能**就地調整**,本身晉升至 **Beta**(feature gate `InPlacePodLevelResourcesVerticalScaling`,**預設啟用**)。詳見官方部落格 [Kubernetes v1.36: In-Place Vertical Scaling for Pod-Level Resources (Beta)](https://kubernetes.io/blog/2026/04/30/kubernetes-v1-36-inplace-pod-level-resources-beta/)。
+
+**跟 7.1 的差異**:7.1 的 `resizePolicy` / `--subresource=resize` 都是**對著單一容器**的 `spec.containers[].resources` 修改;這裡改的是寫在 **Pod 層級**的 `spec.resources`——多個容器(尤其是有 sidecar 的 Pod)共用同一份**聚合資源預算**,而不是各自宣告一份。沒有另外設定自己 `resources` 的容器,會依這個 Pod 層級預算自動算出有效上限。要不要重啟容器套用變更,一樣是看**各容器自己的** `resizePolicy`。
+
+```yaml
+spec:
+  resources:                       # Pod 層級的聚合資源預算(v1.34 Beta 引入)
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  containers:
+    - name: main-app
+      image: my-app:v1
+      resizePolicy:
+        - resourceName: cpu
+          restartPolicy: NotRequired   # CPU 改動不重啟這個容器
+    - name: sidecar
+      image: logger:v1
+      resizePolicy:
+        - resourceName: cpu
+          restartPolicy: NotRequired
+```
+
+```bash
+# 就地調整 Pod 層級的聚合資源預算(v1.36 Beta,走同一個 resize subresource)
+kubectl patch pod shared-pool-app --subresource resize --patch \
+  '{"spec":{"resources":{"limits":{"cpu":"4"}}}}'
+```
+
+> ⚠️ **這仍是 Beta,不是 GA**:跟 7.1 的容器層級 In-Place Resize(已 GA)不同,Pod 層級這條路線目前只到 Beta,API 與行為未來仍可能調整;正式環境採用前務必查官方文件確認當前狀態。
+
+📖 **官方文件**:[Kubernetes v1.36: In-Place Vertical Scaling for Pod-Level Resources (Beta)](https://kubernetes.io/blog/2026/04/30/kubernetes-v1-36-inplace-pod-level-resources-beta/)
+
 ---
 
 ## 7.2 PodDisruptionBudget(PDB):主動中斷保護

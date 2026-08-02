@@ -137,7 +137,7 @@ eBPF 程式本身是**無狀態、短命**的——每次事件觸發、跑完�
 
 ### 2.5 JIT 編譯:跑得跟原生一樣快
 
-通過驗證後,**JIT (Just-In-Time) 編譯器** 會把與架構無關的 eBPF 位元組碼,翻譯成當下 CPU 的**原生機器碼 (Native Machine Code)**。eBPF 的暫存器與指令格式刻意設計成與現代 CPU(x86-64、ARM64 等)的暫存器/呼叫慣例相近,讓 JIT 多半能做到指令一對一映射,目前官方支援 x86-64、arm64、arm32、ppc64、s390x、mips64、sparc64、riscv64/riscv32、loongarch64 等架構(核心原始碼各架構下的 `bpf_jit_comp.c` 為權威來源;概念說明見[核心文件:Classic BPF vs eBPF](https://docs.kernel.org/bpf/classic_vs_extended.html))。所以 eBPF 程式雖然是「動態載入的腳本」,執行效能卻**接近原生編譯的核心程式碼**,沒有直譯器的開銷。
+通過驗證後,**JIT (Just-In-Time) 編譯器** 會把與架構無關的 eBPF 位元組碼,翻譯成當下 CPU 的**原生機器碼 (Native Machine Code)**。eBPF 的暫存器與指令格式刻意設計成與現代 CPU(x86-64、ARM64 等)的暫存器/呼叫慣例相近,讓 JIT 多半能做到指令一對一映射,目前官方支援 x86-64/x86-32、arm64、arm32、ppc64/ppc32、s390x、mips64/mips32、sparc64、riscv64/riscv32、loongarch64 等架構——ppc32 與 mips32 也各自擁有獨立的 eBPF JIT 實作(而非僅有較舊的 classic BPF JIT),分別可見核心原始碼 [`arch/powerpc/net/bpf_jit_comp32.c`](https://github.com/torvalds/linux/blob/master/arch/powerpc/net/bpf_jit_comp32.c)、[`arch/mips/net/bpf_jit_comp32.c`](https://github.com/torvalds/linux/blob/master/arch/mips/net/bpf_jit_comp32.c);相對地 sparc32 至今仍只有 classic BPF JIT、未支援 eBPF,故未列入。核心原始碼各架構下的 `bpf_jit_comp*.c` 為權威來源;概念說明見[核心文件:Classic BPF vs eBPF](https://docs.kernel.org/bpf/classic_vs_extended.html)。所以 eBPF 程式雖然是「動態載入的腳本」,執行效能卻**接近原生編譯的核心程式碼**,沒有直譯器的開銷。
 
 ### 2.6 掛載點 (Hook Points):程式掛在哪裡
 
@@ -544,7 +544,7 @@ grep -E 'CONFIG_BPF|CONFIG_DEBUG_INFO_BTF' /boot/config-$(uname -r)
 
 在 K8s 中部署 eBPF agent(如 Cilium、Falco、Tetragon),通常以 **DaemonSet**(每個節點一份)形式運行,並需注意:
 
-- **特權或精細能力**:Pod 通常需要 `CAP_BPF` / `CAP_PERFMON` / `CAP_NET_ADMIN`,或在受控下使用 `privileged: true`。以 Cilium agent 為例,官方 DaemonSet 預設要求 `NET_ADMIN`、`SYS_ADMIN`、`SYS_RESOURCE`、`IPC_LOCK` 等多項能力([Cilium 官方文件:Restricting privileged Cilium pod access](https://docs.cilium.io/en/stable/security/restrict-pod-access/))。
+- **特權或精細能力**:Pod 通常需要 `CAP_BPF` / `CAP_PERFMON` / `CAP_NET_ADMIN`,或在受控下使用 `privileged: true`。以 Cilium agent 為例,其預設能力清單包含 `NET_ADMIN`、`SYS_ADMIN`、`SYS_RESOURCE`、`IPC_LOCK` 等多項能力(完整清單見 Cilium 原始碼 [`install/kubernetes/cilium/values.yaml`](https://github.com/cilium/cilium/blob/main/install/kubernetes/cilium/values.yaml) 中 `securityContext.capabilities.ciliumAgent` 段落所列出的預設值,額外還包含 `NET_RAW`、`SYS_MODULE`、`DAC_OVERRIDE`、`FOWNER`、`SETGID`、`SETUID`、`SYSLOG`、`CHOWN`、`KILL`)。
 - **掛載核心檔案系統**:常需把宿主的 `/sys/kernel/debug`(debugfs)、`/sys/fs/bpf`(bpffs)掛進容器——eBPF 程式與 map 可以「釘選 (Pin)」到 bpffs 路徑,讓多個行程或重啟後仍能找到、複用同一份物件([eBPF Docs:Pinning](https://docs.ebpf.io/linux/concepts/pinning/))。
 - **eBPF 是節點層級、非命名空間化的**:容器的隔離靠的是命名空間 (Namespace)、cgroup 等核心機制,但所有容器**共用同一個核心**;eBPF 程式作用於**整個核心**,而非單一容器的命名空間。意即一個節點上的 eBPF agent **看得到該節點上所有容器**——這是它強大(全域可觀測)也需謹慎(權限邊界、最小權限原則更重要)之處。
 - **託管叢集 (EKS/GKE/AKS) 的核心限制**:你**無法自選節點核心版本**,得確認雲商提供的核心已啟用 BTF 並支援你需要的功能。這對前一章 `02-eks` 學到的 AWS 環境尤其相關——選用節點 AMI 時要留意核心版本。
