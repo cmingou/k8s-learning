@@ -363,7 +363,7 @@ Error from server (Forbidden): pods "bad-pod" is forbidden: violates PodSecurity
 
 ### 9.4 PSA 取代了舊的 PodSecurityPolicy (PSP)
 
-如果你看舊文章,會看到 **PodSecurityPolicy (PSP)**。它是 K8s 早期的 Pod 安全機制,但因為**設計複雜、授權模型反直覺、容易設錯**,已於 **v1.21 棄用、v1.25 正式移除**(官方[移除公告](https://kubernetes.io/docs/reference/access-authn-authz/psp-to-pod-security-standards/)與[遷移指南](https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/))。Pod Security Admission 已在 [v1.25 成為穩定 (stable) 且預設啟用的內建准入控制器](https://kubernetes.io/docs/concepts/security/pod-security-admission/)。
+如果你看舊文章,會看到 **PodSecurityPolicy (PSP)**。它是 K8s 早期的 Pod 安全機制,但因為**設計複雜、授權模型反直覺、容易設錯**,已於 **v1.21 棄用、v1.25 正式移除**(官方[移除公告](https://kubernetes.io/docs/concepts/security/pod-security-policy/)與[遷移指南](https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/))。Pod Security Admission 已在 [v1.25 成為穩定 (stable) 且預設啟用的內建准入控制器](https://kubernetes.io/docs/concepts/security/pod-security-admission/)。
 
 | | PodSecurityPolicy (PSP，已移除) | Pod Security Admission (PSA,現行) |
 |---|------------------------------|----------------------------------|
