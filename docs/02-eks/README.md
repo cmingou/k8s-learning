@@ -124,7 +124,7 @@ eksctl create cluster \
   --managed                       # 使用 Managed Node Group(推薦)
 ```
 
-> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,之後預設自動進入 **12 個月延伸支援 (Extended Support,需額外付費)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本約落在 `1.34` ~ `1.36` 區間(EKS 與 EKS Distro 已於 [2026-06 公告支援 Kubernetes 1.36](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-eks-distro-kubernetes-version-1-36/));官方 release calendar 標示 `1.33` 已於 2026-07-29 到期,但查證當下 AWS 官方頁面的標準支援版本清單與 1.33 release notes 仍將其列在標準支援內、尚未見延伸支援頁面異動,顯示文件可能有更新延遲——建議建立新叢集前先用 `aws eks describe-cluster-versions` 查當下實際的標準支援清單,而不要照抄教材裡的版本號或 calendar 表的到期日,這個區間會持續往上滾動。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
+> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,期滿後**自動**(到期當天生效,不需另外申請)轉為 **12 個月延伸支援 (Extended Support,需額外付費,費率同步從 $0.10/hr 調整為 $0.60/hr/叢集)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本為 `1.34`~`1.36`(EKS 與 EKS Distro 已於 [2026-06 公告支援 Kubernetes 1.36](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-eks-distro-kubernetes-version-1-36/));`1.33` 已依官方 release calendar 排定的到期日 **2026-07-29 準時結束標準支援、進入延伸支援**(將持續到 2027-07-29)。建立新叢集前仍建議先用 `aws eks describe-cluster-versions` 查當下實際的標準支援清單,而不要照抄教材裡的版本號,這個區間會持續往上滾動。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
 
 > 這個指令通常要跑 **15~20 分鐘**(它在背後用 CloudFormation 建一堆資源)。完成後 eksctl 會自動幫你寫好 `~/.kube/config`。
 
