@@ -618,7 +618,7 @@ eksctl create iamserviceaccount \
 eksctl create addon --name aws-ebs-csi-driver --cluster my-first-eks
 ```
 
-> 官方文件建議透過 [EKS Addon 安裝 EBS CSI Driver](https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html) 以簡化升級與安全性管理;官方目前的建立步驟(eksctl / Console / CLI)已改用權限範圍更收斂的 `AmazonEBSCSIDriverPolicyV2` 受管政策作為預設範例,舊版 `AmazonEBSCSIDriverPolicy` 僅保留給既有角色遷移參考。
+> 官方文件建議透過 [EKS Addon 安裝 EBS CSI Driver](https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html) 以簡化升級與安全性管理;官方目前的建立步驟(eksctl / Console / CLI)已改用權限範圍更收斂的 `AmazonEBSCSIDriverPolicyV2` 受管政策作為預設範例;若不需要以 tag 限縮權限範圍,舊版 `AmazonEBSCSIDriverPolicy` 目前仍是官方支援的選項之一,若要將既有角色從舊政策遷移至 V2,可參考官方的 EBS CSI Driver policy migration 指南。
 
 ### 6.2 StorageClass 與 PVC
 
