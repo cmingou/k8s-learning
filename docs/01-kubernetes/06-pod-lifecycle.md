@@ -468,7 +468,7 @@ spec:
 | `successThreshold` | 連續成功幾次才算「好了」 | readiness 想避免抖動可 > 1;**liveness/startup 只能是 1** |
 | `failureThreshold` | 連續失敗幾次才算「壞了」(預設 3) | 調高 = 更寬容、少誤殺;調低 = 更快反應真故障。和 `periodSeconds` 一起決定「多久才判定不健康」 |
 
-> 上表預設值(`timeoutSeconds=1`、`periodSeconds=10`、`successThreshold=1`、`failureThreshold=3`)出自 [Probe 物件的官方欄位定義](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#probe-v1-core)。
+> 上表預設值(`timeoutSeconds=1`、`periodSeconds=10`、`successThreshold=1`、`failureThreshold=3`)出自 [Probe 物件的官方欄位定義](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#probe-v1-core)。
 
 > 一個實用公式:**判定不健康所需時間 ≈ `periodSeconds × failureThreshold`**。例如 `periodSeconds: 10` + `failureThreshold: 3` ⇒ 大約 30 秒持續失敗才會重啟容器。把這個算清楚,就不會把 liveness 設得太敏感而無謂重啟(第 5 章的核心提醒)。
 
