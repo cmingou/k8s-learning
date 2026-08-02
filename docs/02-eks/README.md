@@ -273,7 +273,7 @@ data:
 
 **新做法(推薦):Access Entries + Access Policies**
 
-AWS 後來推出 **[存取項目 (Access Entries)](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html)**,直接用 AWS API / Console 管理「IAM 身份 → K8s 權限」的對應,不再需要手改 ConfigMap。目前 `aws-auth` ConfigMap 已被官方文件列為**舊式做法 (legacy)**,新叢集建議直接把驗證模式 (Authentication Mode) 設為 `API`,完全改用 Access Entries:
+AWS 後來推出 **[存取項目 (Access Entries)](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html)**,直接用 AWS API / Console 管理「IAM 身份 → K8s 權限」的對應,不再需要手改 ConfigMap。官方文件現已明確將 `aws-auth` ConfigMap 標示為**已棄用 (deprecated)**,新叢集建議直接把驗證模式 (Authentication Mode) 設為 `API`,完全改用 Access Entries:
 
 ```bash
 # 用 Access Entry 把一個 IAM 角色加入叢集,並賦予叢集管理員權限
@@ -793,7 +793,7 @@ eksctl create cluster \
   --name my-auto-eks \
   --region ap-northeast-1 \
   --version 1.34 \                # K8s 版本(請以官方「目前標準支援版本」清單為準,見 2.2 節說明)
-  --auto-mode
+  --enable-auto-mode
 ```
 
 **方式二:Config File(推薦,可版本控管)**
