@@ -611,14 +611,14 @@ K8s 的 PersistentVolume (PV) 在 EKS 上要靠 **CSI Driver (Container Storage 
 eksctl create iamserviceaccount \
   --cluster my-first-eks --namespace kube-system \
   --name ebs-csi-controller-sa \
-  --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
+  --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2 \
   --approve
 
 # 2. 以 EKS Addon 方式安裝(由 AWS 託管、好升級;EKS Auto Mode 叢集不需要這步,已內建)
 eksctl create addon --name aws-ebs-csi-driver --cluster my-first-eks
 ```
 
-> 官方文件建議透過 [EKS Addon 安裝 EBS CSI Driver](https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html) 以簡化升級與安全性管理;若是新建立的角色,也可考慮改用更新、權限範圍更收斂的 `AmazonEBSCSIDriverPolicyV2` 受管政策。
+> 官方文件建議透過 [EKS Addon 安裝 EBS CSI Driver](https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html) 以簡化升級與安全性管理;官方目前的建立步驟(eksctl / Console / CLI)已改用權限範圍更收斂的 `AmazonEBSCSIDriverPolicyV2` 受管政策作為預設範例,舊版 `AmazonEBSCSIDriverPolicy` 僅保留給既有角色遷移參考。
 
 ### 6.2 StorageClass 與 PVC
 
@@ -906,7 +906,7 @@ EKS 升級分兩步,**順序很重要**(詳見官方〈[Update existing cluster 
 
 > **新功能(2026 年 7 月起):版本降版 (Version Rollback)**。EKS 現已支援把控制平面**降回上一個小版本**,不再像過去那樣「降版只能重建叢集」([AWS 公告](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-version-rollback/)、[官方文件](https://docs.aws.amazon.com/eks/latest/userguide/rollback-cluster.html))。
 >
-> - **限制**:須在升級完成後 **7 天內**發起;一次只能降一個小版本(N → N-1,不能跳版);僅適用於透過「原地升級」升上來的叢集(叢集建立時就是該版本則無法降版)。
+> - **限制**:須在升級完成後 **7 天內**發起;一次只能降一個小版本(N → N-1,不能跳版);僅適用於透過「原地升級」升上來的叢集(叢集建立時就是該版本則無法降版);若降版目標版本已進入延伸支援 (Extended Support),須先把叢集升級政策 (Upgrade Policy) 改為 `EXTENDED`;若叢集是在延伸支援期滿被自動升級的,則無法再降版回前一版。
 > - **指令**:與升級共用同一個 API——`aws eks update-cluster-version --name my-cluster --kubernetes-version <上一版>`。
 > - **節點**:Managed Node Group 需另外用 `update-nodegroup-version` 個別降版;EKS Auto Mode 會自動一併處理。
 > - **例外**:不支援 Fargate 節點(需先手動刪除跑在目標降版本上的 Fargate Pod,否則會觸發 kubelet 版本偏移的 ERROR 提示);Addon 版本也**不會**自動跟著降版,需自行檢查相容性並視需要手動調整。
