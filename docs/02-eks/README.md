@@ -124,7 +124,7 @@ eksctl create cluster \
   --managed                       # 使用 Managed Node Group(推薦)
 ```
 
-> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,之後預設自動進入 **12 個月延伸支援 (Extended Support,需額外付費)**,總計 26 個月生命週期。目前(2026 年中)標準支援版本約落在 `1.33` ~ `1.36` 區間,建議建立新叢集前先用 `aws eks describe-cluster-versions` 查當下的標準支援清單,而不要照抄教材裡的版本號。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
+> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,之後預設自動進入 **12 個月延伸支援 (Extended Support,需額外付費)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本約落在 `1.34` ~ `1.36` 區間(`1.33` 已於 2026-07-29 結束標準支援、進入延伸支援),建議建立新叢集前先用 `aws eks describe-cluster-versions` 查當下的標準支援清單,而不要照抄教材裡的版本號。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
 
 > 這個指令通常要跑 **15~20 分鐘**(它在背後用 CloudFormation 建一堆資源)。完成後 eksctl 會自動幫你寫好 `~/.kube/config`。
 
@@ -792,7 +792,7 @@ flowchart LR
 eksctl create cluster \
   --name my-auto-eks \
   --region ap-northeast-1 \
-  --version 1.33 \
+  --version 1.34 \
   --auto-mode
 ```
 
@@ -806,7 +806,7 @@ kind: ClusterConfig
 metadata:
   name: my-auto-eks
   region: ap-northeast-1
-  version: "1.33"
+  version: "1.34"
 
 autoModeConfig:
   enabled: true
