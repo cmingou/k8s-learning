@@ -52,7 +52,7 @@ flowchart LR
 
 ### 2.1 它怎麼知道後面有哪些 Pod?Endpoints / EndpointSlice
 
-Service 並不直接連 Pod。背後有個機制:**EndpointSlice 控制器**持續掃描「符合 selector 且已就緒 (ready) 的 Pod」,把它們的 IP 列成一份清單。Service 的流量就導向這份清單。EndpointSlice 是現行的標準機制,取代舊版的 Endpoints API(舊 API 在大規模叢集下有單一物件被截斷等限制,目前已標示為過時)([EndpointSlices 官方文件](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/))。
+Service 並不直接連 Pod。背後有個機制:**EndpointSlice 控制器**持續掃描「符合 selector 且已就緒 (ready) 的 Pod」,把它們的 IP 列成一份清單。Service 的流量就導向這份清單。EndpointSlice 是現行的標準機制,取代舊版的 Endpoints API(舊 API 在大規模叢集下有單一物件被截斷等限制,自 **v1.33** 起依 **KEP-4974** 正式標示為棄用,讀寫 v1 Endpoints 會收到 API Server 的棄用警告)([EndpointSlices 官方文件](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/)、[Kubernetes v1.33 部落格:Endpoints → EndpointSlice 過渡說明](https://kubernetes.io/blog/2025/04/24/endpoints-deprecation/))。
 
 > 這也是為什麼 readiness 探針(第 5 章)很重要:**沒就緒的 Pod 不會被列入 Endpoints,流量不會打到它。** 升級時這保證了「只有準備好的 Pod 才接客」。
 
