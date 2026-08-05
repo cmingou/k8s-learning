@@ -41,6 +41,8 @@
 
 > 重點觀念:**EKS 不是「全託管」,是「控制平面託管」。** 資料平面 (Data Plane,也就是節點與應用) 大部分還是你的責任。
 
+> **補充:控制平面也能「按容量訂閱」——EKS Provisioned Control Plane**。標準 EKS 控制平面的擴縮是全自動、對使用者不可見的;但對超大規模叢集(數千節點的 AI/ML 訓練、HPC),AWS 另外提供 **Provisioned Control Plane**,讓你**明確選擇**控制平面的容量等級(scaling tier),換取更高、更可預期的 API Server 處理能力與 SLA——例如 2026-03 推出的 **8XL tier**(API Server 請求處理量是次一級 4XL 的兩倍)搭配 **99.99% SLA**(標準控制平面為 99.95%),以及 2026-07 進一步把 HPA 同步併發度提升到預設值的最多 40 倍。此功能需 Kubernetes **1.29 以上**,屬於「一般用不到,但大規模場景值得知道」的選配加固。詳見 AWS 官方〈[Amazon EKS Provisioned Control Plane](https://docs.aws.amazon.com/eks/latest/userguide/eks-provisioned-control-plane.html)〉與 what's new 公告([SLA/8XL,2026-03](https://aws.amazon.com/about-aws/whats-new/2026/03/amazon-eks-announces-sla-8xl-scaling-tier)、[HPA 加速,2026-07](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-provisioned-control/))。
+
 ### 1.2 與 GKE / AKS 的定位
 
 | 項目 | EKS (AWS) | GKE (Google) | AKS (Azure) |
