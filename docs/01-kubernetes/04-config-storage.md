@@ -98,7 +98,7 @@ Secret 跟 ConfigMap 用法幾乎一樣,但專門放機密。
 
 ### 3.1 重要觀念:Secret 預設只是 Base64,不是加密!
 
-很多人誤會 Secret 是「加密的」。**預設情況下,Secret 在 etcd 裡只是 Base64 編碼,任何人 Base64 decode 就能還原。** 官方文件甚至直接寫明:「Kubernetes Secrets 預設以未加密的形式存在 API Server 底層的資料儲存(etcd)中,任何有 API 存取權或 etcd 存取權的人都能讀取或修改」([Secrets 官方文件](https://kubernetes.io/docs/concepts/configuration/secret/#caution))。它的真正保護來自:
+很多人誤會 Secret 是「加密的」。**預設情況下,Secret 在 etcd 裡只是 Base64 編碼,任何人 Base64 decode 就能還原。** 官方文件甚至直接寫明:「Kubernetes Secrets 預設以未加密的形式存在 API Server 底層的資料儲存(etcd)中,任何有 API 存取權或 etcd 存取權的人都能讀取或修改」([Secrets 官方文件](https://kubernetes.io/docs/concepts/configuration/secret/))。它的真正保護來自:
 
 1. **存取控制 (RBAC)**:限制誰能讀 Secret(第 5 章)。
 2. **靜態加密 (encryption at rest)**:需要另外在 API Server 開啟 `EncryptionConfiguration`,才會真的加密寫進 etcd([Encrypting Confidential Data at Rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/))。
@@ -148,7 +148,7 @@ spec:
 | `kubernetes.io/dockerconfigjson` | 拉私有映像倉庫的認證 |
 | `kubernetes.io/service-account-token` | ServiceAccount 的長期 token(第 5 章) |
 
-> **版本提醒**:`kubernetes.io/service-account-token` 這種長期有效的 Secret 屬於**舊機制 (legacy mechanism)**。自 **Kubernetes v1.22** 起,官方建議改用 [TokenRequest API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-request-v1/) 取得短期、會自動輪替的 token(例如 `kubectl create token <serviceaccount>`),而不是建立長期不過期的 Secret([Secrets 官方文件 — Service account token Secrets](https://kubernetes.io/docs/concepts/configuration/secret/#service-account-token-secrets))。
+> **版本提醒**:`kubernetes.io/service-account-token` 這種長期有效的 Secret 屬於**舊機制 (legacy mechanism)**。自 **Kubernetes v1.22** 起,官方建議改用 [TokenRequest API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-request-v1/) 取得短期、會自動輪替的 token(例如 `kubectl create token <serviceaccount>`),而不是建立長期不過期的 Secret([Secrets 官方文件 — ServiceAccount token Secrets](https://kubernetes.io/docs/concepts/configuration/secret/#serviceaccount-token-secrets))。
 
 ```bash
 # 建立 TLS Secret 給 Ingress

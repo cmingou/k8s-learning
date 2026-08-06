@@ -77,11 +77,11 @@ API Server 是叢集的 **REST API 入口**。所有人(你的 kubectl、其他�
 - **准入控制 (Admission Control)**:這個請求合不合規?要不要改寫?(例如自動注入預設值)
 - **驗證與寫入 etcd**:把資源存進唯一的資料庫。
 
-它是**無狀態 (stateless)** 的——狀態全在 etcd,所以 API Server 可以水平擴充多份做高可用 (HA)([Kubernetes Components](https://kubernetes.io/docs/concepts/overview/components/#kube-apiserver))。
+它是**無狀態 (stateless)** 的——狀態全在 etcd,所以 API Server 可以水平擴充多份做高可用 (HA)([Kubernetes Cluster Architecture](https://kubernetes.io/docs/concepts/architecture/#kube-apiserver))。
 
 ### 3.2 etcd — 叢集的記憶
 
-etcd 是一個**分散式鍵值資料庫 (distributed key-value store)**,保存叢集裡每一個物件的完整狀態。它用 Raft 共識演算法保證多副本資料一致([官方元件總覽](https://kubernetes.io/docs/concepts/overview/components/#etcd))。
+etcd 是一個**分散式鍵值資料庫 (distributed key-value store)**,保存叢集裡每一個物件的完整狀態。它用 Raft 共識演算法保證多副本資料一致([官方叢集架構文件](https://kubernetes.io/docs/concepts/architecture/#etcd))。
 
 > 為什麼 etcd 這麼重要?因為**整個叢集的真相都在這裡**。etcd 沒了,叢集就失憶了。正式環境一定要定期備份 etcd(`etcdctl snapshot save`),這也是 CKA 必考題。
 
@@ -102,7 +102,7 @@ ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \
 |------|------|
 | **分散式鍵值資料庫** | 資料以 key-value 形式儲存,K8s 把每個物件都存成一筆筆的 key。 |
 | **強一致性 (strong consistency)** | 用 **Raft 共識演算法**,任何一筆寫入都要多數節點確認才算成立,讀到的永遠是最新且一致的資料(不是「最終一致」)。 |
-| **Watch 機制** | 客戶端可以「訂閱」某個 key 的變化,一有變動立刻被通知。API Server 靠它感知變更,是 K8s 調和迴圈的引擎;其他控制平面元件(controller-manager / scheduler 等)則 watch **API Server**,不直接連 etcd([Kubernetes API 概念](https://kubernetes.io/docs/concepts/overview/kubernetes-api/)、[元件總覽:etcd](https://kubernetes.io/docs/concepts/overview/components/#etcd))。 |
+| **Watch 機制** | 客戶端可以「訂閱」某個 key 的變化,一有變動立刻被通知。API Server 靠它感知變更,是 K8s 調和迴圈的引擎;其他控制平面元件(controller-manager / scheduler 等)則 watch **API Server**,不直接連 etcd([Kubernetes API 概念](https://kubernetes.io/docs/concepts/overview/kubernetes-api/)、[叢集架構:etcd](https://kubernetes.io/docs/concepts/architecture/#etcd))。 |
 | **MVCC + revision** | 每次寫入都有一個遞增的版本號 (revision),支援多版本並行與歷史查詢。 |
 | **Lease(租約)/ TTL** | key 可綁定有期限的租約,用來做 leader 選舉、分散式鎖。 |
 | **對磁碟延遲敏感** | 每筆寫入要 fsync 落盤並複製給多數節點,**強烈建議用 SSD**;磁碟慢會直接拖垮整個叢集的反應速度。 |
