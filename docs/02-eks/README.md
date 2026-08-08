@@ -309,7 +309,7 @@ aws eks associate-access-policy \
 
 **原理:OIDC + ServiceAccount Token**(詳見官方〈[IAM roles for service accounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)〉)
 
-1. EKS 叢集會有一個 **OIDC 提供者 (OIDC Provider)** 的 URL。(2026 年 7 月起,這個 OIDC discovery / JWKS 端點也支援 **[AWS PrivateLink](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-oidc-endpoint-privatelink/)**:可在 VPC 內建立 `com.amazonaws.<region>.oidc-eks` 介面端點,讓 eksctl / Terraform / 自製 token 驗證器等工具在沒有對外網路的 VPC 中也能私下解析與驗證 IRSA token,不必額外收費。)
+1. EKS 叢集會有一個 **OIDC 提供者 (OIDC Provider)** 的 URL。(2026 年 7 月起,這個 OIDC discovery / JWKS 端點也支援 **[AWS PrivateLink](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-eks-oidc-endpoint-privatelink/)**:可在 VPC 內建立 `com.amazonaws.<region>.oidc-eks` 介面端點,讓 eksctl / Terraform / 自製 token 驗證器等工具在沒有對外網路的 VPC 中也能私下解析與驗證 IRSA token,這項功能本身不額外收費,但仍會依**標準 AWS PrivateLink 定價**計費(介面端點每小時費用 + 資料處理費用)。)
 2. 你在 IAM 建立一個角色,它的「信任政策 (Trust Policy)」寫明:**「我信任這個叢集的 OIDC,而且只信任 `namespace:serviceaccount` 是某某的請求」**。
 3. 當 Pod 啟動,K8s 會把一個「**有時效的 OIDC Token**(Projected ServiceAccount Token)」掛載進 Pod。
 4. AWS SDK 自動拿這個 Token 去 STS `AssumeRoleWithWebIdentity`,換到一組**臨時、會自動輪替**的 AWS 憑證。
