@@ -204,7 +204,7 @@ kubelet 是跑在**每一台節點上**的代理程式 (agent)。它的職責很
 - **containerd**(目前最主流)
 - **CRI-O**
 
-> 歷史補充:早期用 Docker,後來 K8s 在 **v1.24** 版正式移除了 Docker 的相容墊片 (dockershim)(v1.20 開始預告棄用),現在直接用 containerd 或 CRI-O。映像格式還是相容的,所以對你寫 YAML 沒影響。詳見 [Dockershim removal FAQ](https://kubernetes.io/dockershim/)。
+> 歷史補充:早期用 Docker,後來 K8s 在 **v1.24** 版正式移除了 Docker 的相容墊片 (dockershim)(v1.20 開始預告棄用),現在直接用 containerd 或 CRI-O。映像格式還是相容的,所以對你寫 YAML 沒影響。詳見 [Dockershim removal FAQ](https://kubernetes.io/blog/2022/02/17/dockershim-faq/)。
 
 ### 4.3 kube-proxy — 讓 Service 的虛擬 IP 能通
 
