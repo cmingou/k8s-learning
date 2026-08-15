@@ -752,6 +752,8 @@ spec:
 
 > **節點的安全與生命週期預設值**:Auto Mode 節點用的是強化過的 [Bottlerocket](https://aws.amazon.com/bottlerocket) AMI(**唯讀根檔案系統、SELinux 強制模式、禁止 SSH/SSM 直連**),而且**每個節點最長存活 21 天**就會被自動汰換成新節點,確保 OS 與元件保持最新。這也是為什麼下表「不支援自訂 AMI / 直接 SSH」——節點被刻意設計成不可變 (immutable)。
 
+> **新功能(2026 年 7 月起):與 ARC Zonal Shift 整合**。EKS Auto Mode 現在原生支援 [Amazon Application Recovery Controller (ARC) 的 zonal shift / zonal autoshift](https://docs.aws.amazon.com/eks/latest/userguide/zone-shift.html)([AWS 公告](https://aws.amazon.com/about-aws/whats-new/2026/07/eks-auto-mode-arc-zonal-shift/)):當某個可用區(AZ)被判定為異常(不論是手動觸發 zonal shift,還是授權 AWS 自動處理的 zonal autoshift),Auto Mode 會**自動停止在該 AZ 佈建新容量,並暫停會造成擾動的自願性節點操作(如整併 consolidation、drift 汰換)**,把叢集內部流量導離受影響的 AZ;shift 結束或取消後自動恢復正常運作。因為節點生命週期本來就由 AWS 管理,啟用這項功能**不需要另外設定 IAM 權限或管理 Karpenter 版本**,直接在叢集上開啟 ARC zonal shift 即可,且**不另外收費**。此功能已在所有提供 EKS Auto Mode 的 AWS 區域上線。
+
 #### 責任分工對比
 
 | 項目 | 標準 EKS | EKS Auto Mode |
