@@ -176,12 +176,15 @@ kubectl get pods -A            # 看系統 Pod(coredns、aws-node、kube-proxy)
 
 ```hcl
 # main.tf — 用官方 EKS module 建立(節錄,實務上還要先建 VPC module)
+# 模組 v21(2025-07 起)重新命名了多數變數(去掉 cluster_ 前綴)並要求
+# Terraform >= 1.5.7、AWS provider >= 6.0,參考官方升版指南:
+# https://github.com/terraform-aws-modules/terraform-aws-eks/blob/master/docs/UPGRADE-21.0.md
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+  version = "~> 21.0"
 
-  cluster_name    = "my-first-eks"
-  cluster_version = "1.34"   # 建立前請查當下標準支援版本清單
+  name               = "my-first-eks"
+  kubernetes_version = "1.34"   # 建立前請查當下標準支援版本清單
 
   vpc_id     = module.vpc.vpc_id                 # 來自 vpc module
   subnet_ids = module.vpc.private_subnets
