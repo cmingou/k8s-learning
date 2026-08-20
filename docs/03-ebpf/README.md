@@ -473,7 +473,7 @@ eBPF 用**雜湊表 (Hash Map)** 做查找,複雜度從 `O(n)` 降到接近 `O(1
 
 **Hubble** 是 Cilium 的可觀測性元件,讓你即時看到「哪個 Pod 跟哪個 Pod 講話、用什麼協定、有沒有被策略擋下」——服務地圖一目了然。
 
-> **版本現況**:[Cilium 1.20.0](https://github.com/cilium/cilium/releases/tag/v1.20.0) 已於 2026 年 7 月發布(超過 2,660 個 commit),Gateway API 支援由 v1.4 提升到 **v1.6.1**(對應本教材第 1 章 5.3 節談到的 TCPRoute/UDPRoute GA),並支援 Kubernetes v1.36。升級前請注意官方列出的重大變更項目(legacy Mutual Authentication、Envoy Go extensions、`cilium.io/v2alpha1 CiliumNodeConfig` 等)。
+> **版本現況**:[Cilium 1.20.0](https://github.com/cilium/cilium/releases/tag/v1.20.0) 已於 2026 年 7 月發布(超過 2,660 個 commit),Gateway API 支援由 v1.4 提升到 **v1.6.1**(對應本教材第 1 章 5.3 節談到的 TCPRoute/UDPRoute GA),並支援 Kubernetes v1.36。升級前請注意官方列出的重大變更項目(legacy Mutual Authentication、Envoy Go extensions、`cilium.io/v2alpha1 CiliumNodeConfig` 等)。目前最新修補版為 [Cilium 1.20.1](https://github.com/cilium/cilium/releases/tag/v1.20.1)(以 bug fix 與文件修訂為主,未變更 Gateway API / Kubernetes 版本支援範圍)。
 
 ```bash
 # 用 Helm 安裝 Cilium 並啟用「取代 kube-proxy」模式(概念示意)
