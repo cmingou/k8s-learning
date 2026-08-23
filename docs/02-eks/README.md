@@ -45,6 +45,8 @@
 
 > **補充:2026-08 新功能——進階控制平面設定 (Advanced Kubernetes control plane configuration)**。不同於上面 Provisioned Control Plane「調容量等級」,這是讓你**直接調整 API Server / Scheduler / Controller Manager 的行為參數**,例如把排程器的節點資源適配策略 (node resource fit strategy) 設成 **`MostAllocated`**(優先把 Pod 塞進已經較滿的節點以提高密度、減少節點數;預設的 `LeastAllocated` 則是盡量把負載打散、保留每個節點的餘裕)、調整 HPA 對負載變化的反應速度(`horizontalPodAutoscalerSyncPeriod`,例如把預設 15s 縮短為 10s;**但這項參數需搭配上述的 Provisioned Control Plane 才能設定,屬另外計費**)、設定 event 保留時間等。需 **Kubernetes 1.31 以上**,可透過既有的 `CreateCluster`/`UpdateClusterConfig` API 設定(Console/AWS CLI/CloudFormation/CDK/**eksctl** 已於推出時支援,ACK、Terraform 官方表示後續跟進),此功能本身**不額外收費**(但如上所述,`horizontalPodAutoscalerSyncPeriod` 等需要 Provisioned Control Plane 的參數,仍會依該分層按小時計費)。詳見 AWS 官方〈[Advanced Kubernetes control plane configuration](https://docs.aws.amazon.com/eks/latest/userguide/control-plane-configuration.html)〉與 [what's new 公告(2026-08)](https://aws.amazon.com/about-aws/whats-new/2026/08/amazon-eks-control-plane-configuration-parameters/)。
 
+> **補充:2026-08 新功能——憑證授權單位輪替 (Certificate Authority Rotation)**。上表把「憑證輪替」列為自建 K8s 才需要煩惱的事,但這其實有個時效性的但書:每個 EKS 叢集都有自己的一組 CA,用來加密 API Server 的連線;2018 年 EKS 剛推出時建立的叢集,CA 有效期是 **10 年**,現在陸續來到該輪替的時間點。AWS 因此推出**具自動化安全機制的 CA 輪替管理**——採**共同責任制**:AWS 負責輪替生命週期本身,並自動讓 AWS 託管元件(如 EKS Auto Mode 節點、Fargate 節點)信任新的後繼 CA (successor CA);但**自管節點需要自己更換、外部用戶端(如你本機的 kubectl/CI 系統)也要自己更新信任鏈**才能在新 CA 啟用後繼續連線。AWS 提供多重安全網:到期前提前通知、你沒動作時自動幫你建立後繼 CA、你沒按時啟用時自動代為啟用,並可在切換過程中**回滾**到舊 CA。此功能**不額外收費**,已在所有商業 AWS 區域可用。詳見 AWS 官方 [what's new 公告(2026-08-20)](https://aws.amazon.com/about-aws/whats-new/2026/08/amazon-eks-certificate-authority-ca-rotation-automated-lifecycle-management/)。
+
 ### 1.2 與 GKE / AKS 的定位
 
 | 項目 | EKS (AWS) | GKE (Google) | AKS (Azure) |
