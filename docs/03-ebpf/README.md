@@ -444,7 +444,7 @@ func main() {
 > **現況補充**:K8s 社群也意識到此問題。
 >
 > - `kube-proxy` 的 **nftables 模式**已於 **1.33** 版 GA,用近似 `O(1)` 的映射結構解決了同樣的效能問題([Kubernetes 官方部落格:NFTables mode for kube-proxy](https://kubernetes.io/blog/2025/02/28/nftables-kube-proxy/));不過 iptables 目前仍是上游預設模式。
-> - IPVS 模式的棄用走**多版本漸進式**時程,依照官方 [KEP-5495](https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/5495-deprecate-ipvs-mode-in-kube-proxy):**1.35** 起印出棄用警告(功能仍完整可用)、**1.37** 引入 `KubeProxyIPVS` feature gate(預設 `true`)、**1.40** 預設翻成 `false`、**1.43** 才真正移除程式碼(`pkg/proxy/ipvs`)、**1.46** 清掉 feature gate。社群建議及早改用 nftables 以避免屆時被迫遷移。留意 AWS 的 [EKS 1.35 版本說明](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions-standard.html#kubernetes-1-35)截至目前(2026-07)仍寫著「will be removed in Kubernetes 1.36」,而 1.36 已於 2026-04 發布且並未移除 IPVS,此說法已被實際發布時程證偽,與上游 KEP-5495(程式碼要到 1.43 才移除)也不一致——實際時程請一律以上游 KEP-5495 追蹤進度為準,而非 AWS 文件的這句敘述。
+> - IPVS 模式的棄用走**多版本漸進式**時程,依照官方 [KEP-5495](https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/5495-deprecate-ipvs-mode-in-kube-proxy):**1.35** 起印出棄用警告(功能仍完整可用)、**1.37** 引入 `KubeProxyIPVS` feature gate(預設 `true`)、**1.40** 預設翻成 `false`、**1.43** 才真正移除程式碼(`pkg/proxy/ipvs`)、**1.46** 清掉 feature gate。社群建議及早改用 nftables 以避免屆時被迫遷移。**Kubernetes v1.37(代號 Garhwal)已於 2026-08-26 正式發布**([官方發布公告](https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/)),上述 `KubeProxyIPVS` feature gate 現已隨此版本實際生效,而非僅是規劃中的時程。留意 AWS 的 [EKS 1.35 版本說明](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions-standard.html#kubernetes-1-35)截至目前(2026-07)仍寫著「will be removed in Kubernetes 1.36」,而 1.36 已於 2026-04 發布且並未移除 IPVS,此說法已被實際發布時程證偽,與上游 KEP-5495(程式碼要到 1.43 才移除)也不一致——實際時程請一律以上游 KEP-5495 追蹤進度為準,而非 AWS 文件的這句敘述。
 > - 但 nftables/IPVS 都只解決了「Service 轉送」這一項問題,並未涵蓋 eBPF 在身分型網路策略、L7 可視性、無侵入式可觀測性上的能力——這正是 Cilium 等 eBPF 方案除了取代 kube-proxy 之外仍有價值的原因。
 
 ```mermaid
@@ -519,7 +519,7 @@ eBPF 的功能與核心版本**強相關**。各功能登場的大致里程碑(�
 | **5.7** | [BPF LSM](https://docs.kernel.org/bpf/prog_lsm.html) 引入 |
 | **5.8** | `CAP_BPF` / `CAP_PERFMON` 權限拆分、[Ring Buffer 映射](https://docs.kernel.org/bpf/ringbuf.html) 引入 |
 
-**實務建議:做 CO-RE 與現代開發,以核心 **5.4+**(理想 5.8+)且**啟用 BTF**(`CONFIG_DEBUG_INFO_BTF=y`)為基準。**(截至 2026 年中,主線核心已進入 **7.x** 系列——[Linux 7.0 於 2026 年 4 月發布](https://kernelnewbies.org/Linux_7.0);上述 5.4+/5.8+ 只是「CO-RE 可用」的**最低**基準,新專案沒有理由不用更新的 LTS 核心。)
+**實務建議:做 CO-RE 與現代開發,以核心 **5.4+**(理想 5.8+)且**啟用 BTF**(`CONFIG_DEBUG_INFO_BTF=y`)為基準。**(截至 2026 年 8 月,主線核心已進入 **7.x** 系列——[Linux 7.0 於 2026 年 4 月發布](https://kernelnewbies.org/Linux_7.0),其後 7.1 接續,**7.2**(代號 "Baby Opossum Posse")已於 **2026-08-16** 發布([Phoronix 報導](https://www.phoronix.com/news/Linux-7.2-Released));上述 5.4+/5.8+ 只是「CO-RE 可用」的**最低**基準,新專案沒有理由不用更新的 LTS 核心。)
 
 > **近期已知的 eBPF 相關核心安全公告**(提醒:eBPF 的攻擊面包含驗證器、maps、helper 三處,以下各對應一處):
 > - **[CVE-2026-63830](https://ubuntu.com/security/CVE-2026-63830)**(CVSS 9.4,Critical,2026-07-19 揭露):`sk_msg` 的 `sg.copy` bitmap 是 scatterlist entry 的「所有權狀態」標記,但 sockmap/TLS 的 transform 路徑在 move、copy、split、compact `msg->sg.data[]` entries 時,沒有同步搬動對應的 `sg.copy` bit,導致外部(page cache)所擁有的記憶體頁被誤判為可由 BPF 修改,可寫入原本唯讀的 page cache 內容。屬於本節分類中的 **maps/helper** 攻擊面,是目前這份 CVE 清單中嚴重度最高的一筆;修補見核心 commit [`406e8a651a7b`](https://git.kernel.org/linus/406e8a651a7b854c41fecd5117bb282b3a6c2c6b)。

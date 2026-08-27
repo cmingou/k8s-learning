@@ -130,7 +130,7 @@ eksctl create cluster \
   --managed                       # 使用 Managed Node Group(推薦)
 ```
 
-> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,期滿後**自動**(到期當天生效,不需另外申請)轉為 **12 個月延伸支援 (Extended Support,需額外付費,費率同步從 $0.10/hr 調整為 $0.60/hr/叢集)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本為 `1.34`~`1.36`(EKS 與 EKS Distro 已於 [2026-06 公告支援 Kubernetes 1.36](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-eks-distro-kubernetes-version-1-36/));`1.33` 已依官方 release calendar 排定的到期日 **2026-07-29 準時結束標準支援、進入延伸支援**(將持續到 2027-07-29)。建立新叢集前仍建議先用 `aws eks describe-cluster-versions` 查當下實際的標準支援清單,而不要照抄教材裡的版本號,這個區間會持續往上滾動。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。
+> **版本支援政策**:EKS 的每個 Kubernetes 小版本,從發布起有 **14 個月標準支援 (Standard Support)**,期滿後**自動**(到期當天生效,不需另外申請)轉為 **12 個月延伸支援 (Extended Support,需額外付費,費率同步從 $0.10/hr 調整為 $0.60/hr/叢集)**,總計 26 個月生命週期。目前(2026 年 8 月)標準支援版本為 `1.34`~`1.36`(EKS 與 EKS Distro 已於 [2026-06 公告支援 Kubernetes 1.36](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-eks-distro-kubernetes-version-1-36/));`1.33` 已依官方 release calendar 排定的到期日 **2026-07-29 準時結束標準支援、進入延伸支援**(將持續到 2027-07-29)。建立新叢集前仍建議先用 `aws eks describe-cluster-versions` 查當下實際的標準支援清單,而不要照抄教材裡的版本號,這個區間會持續往上滾動。詳見官方〈[Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html)〉。上游 Kubernetes **v1.37**(代號 Garhwal)已於 **2026-08-26** GA([官方發布公告](https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/)),EKS 過往新版本上架約需 6 週(如 1.36 上游 2026-04-22 發布、EKS 於 2026-06-02 開始支援),故 1.37 預期在未來數週內成為 EKS 新增支援版本,建立叢集前務必重新查詢當下清單。
 
 > 這個指令通常要跑 **15~20 分鐘**(它在背後用 CloudFormation 建一堆資源)。完成後 eksctl 會自動幫你寫好 `~/.kube/config`。
 
@@ -753,6 +753,8 @@ spec:
 ```
 
 > 成本觀點:**Karpenter 的 `consolidation`(整併)會主動把閒置/低使用率節點收掉**,是很有效的省錢機制。設 `limits` 上限可避免擴容失控。
+>
+> **新選項:`Balanced`**。除了範例中的 `WhenEmptyOrUnderutilized`,EKS Auto Mode 於 **2026-07-27** 新增了 `consolidationPolicy: Balanced`——它會同時權衡「整併省下的運算成本」與「整併造成的中斷成本」再決定是否收斂節點,官方將其定位為 `WhenEmptyOrUnderutilized` 的升級路徑。詳見 [EKS Auto Mode 發布紀錄](https://docs.aws.amazon.com/eks/latest/userguide/auto-change.html)。
 >
 > 該怎麼選?AWS 官方[最佳實踐指南](https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html)給的是「依工作負載特性」而非一律建議 Karpenter:負載忽高忽低、機型需求多樣就選 Karpenter;負載穩定單純,Node Group + CA 一樣夠用且更省心。
 
