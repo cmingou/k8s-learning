@@ -367,6 +367,8 @@ flowchart LR
 | 視覺化 / 告警 | 無 | Grafana 儀表板 + Alertmanager 告警 |
 
 > 簡單說:**metrics-server 是給叢集內部機制(HPA)用的「即時體溫計」;Prometheus + Grafana 才是給人看的「監控中心」。** 官方明確說明 metrics-server [不是設計給監控用途使用](https://kubernetes-sigs.github.io/metrics-server/),只服務 autoscaling pipeline。 Prometheus 主動「抓取 (scrape)」各服務暴露的 `/metrics` 端點,存成時序資料;Grafana 把它畫成儀表板;Alertmanager 在指標越線時通知你。正式環境兩者通常用 **kube-prometheus-stack** 這個 Helm Chart 一次裝齊(呼應第 2 節:裝別人的東西就用 Helm)。
+>
+> **版本補充**:metrics-server 實作的 `metrics.k8s.io`(供 `kubectl top`、HPA 讀取即時 CPU/記憶體用量的 API)歷經近九年 Beta 之後,已於 **[Kubernetes v1.37](https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/)(2026-08-26 發布)正式晉升 Stable(`v1`)**。新的 `v1` 與既有 `v1beta1` 結構相同、行為不變,`v1beta1` 會繼續並行運作,不影響本節既有指令與流程。
 
 ### 5.2 日誌 (Logs):從 stdout 到集中式收集
 

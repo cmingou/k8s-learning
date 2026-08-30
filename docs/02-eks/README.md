@@ -984,6 +984,12 @@ eksctl update addon --name kube-proxy --cluster my-first-eks
 
 > 與自建 K8s 的差異:控制平面升級在 EKS 是「按一下」,但**節點升級、外掛相容性、API 棄用 (Deprecated API) 檢查仍是你的責任**。升級前務必看 K8s 版本的 deprecation 公告,並用 `kubectl` 確認沒有用到被移除的 API;官方也提供 [EKS Upgrade Insights](https://docs.aws.amazon.com/eks/latest/userguide/cluster-insights.html) 自動掃描叢集是否用到即將棄用的 API。若用 EKS Auto Mode,節點會在控制平面升級後自動分批更新,但仍需手動升級控制平面本身。
 
+### 8.3 GitOps:EKS Capability for Argo CD(全託管)
+
+除了自己在叢集裡裝 Argo CD 做 GitOps,EKS 也提供**全託管的 Argo CD 能力——EKS Capability for Argo CD**,屬於 AWS 較新的 **EKS Capabilities**(工作負載編排與雲端資源管理)產品家族之一。與自架 Argo CD 最大的差異:控制平面(Argo CD Server、Application Controller、Repo Server 等元件)全部跑在 **AWS 託管帳號、叢集之外**,由 AWS 負責擴縮、升級與跨叢集通訊,並原生整合 AWS Secrets Manager、ECR、CodeCommit、CodeConnections 等服務;功能面完整支援 Application/ApplicationSet、自動同步、多叢集部署、sync waves/hooks、資源健康檢查、回滾、Helm/Kustomize/純 YAML 等主流 Argo CD 工作流程。計費採**按小時計費**:每個啟用的 Capability 有一筆基本時薪,再依所管理的 Argo CD Application 數量計時計費,無最低承諾或預付費用。詳見 AWS 官方〈[Continuous Deployment with Argo CD](https://docs.aws.amazon.com/eks/latest/userguide/argocd.html)〉與部落格〈[Announcing Amazon EKS Capabilities](https://aws.amazon.com/blogs/aws/announcing-amazon-eks-capabilities-for-workload-orchestration-and-cloud-resource-management/)〉。
+
+> **補充:2026-08-21 新功能——自訂設定 (Custom Configuration)**。EKS Capability for Argo CD 現在支援透過標準的 `argocd-cm` ConfigMap 做自訂設定——設定方式與自架 Argo CD 完全相同(AWS 直接把你的設定套用到託管的 Capability),可自訂 Custom Resource 的健康檢查邏輯、Argo CD UI 的橫幅內容,以及調整 Capability 監看/比對受管資源的方式,讓叢集管理者對「Argo CD 如何回報應用程式健康狀態」有更多掌控權。詳見 AWS 官方 [what's new 公告(2026-08-21)](https://aws.amazon.com/about-aws/whats-new/2026/08/amazon-eks-argo-cd-configuration/) 與 [Comparing EKS Capability for Argo CD to self-managed Argo CD](https://docs.aws.amazon.com/eks/latest/userguide/argocd-comparison.html)。
+
 ### 動手練習 8
 
 1. 啟用 Container Insights,到 CloudWatch 看叢集的 CPU/記憶體圖表。
