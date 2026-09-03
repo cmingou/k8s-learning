@@ -281,6 +281,8 @@ kubectl get hpa -w               # 觀察副本數隨負載變化
 > **前提**:HPA 的 CPU 百分比是相對於 **requests** 算的,所以**容器一定要設 requests**,否則該 Pod 的 CPU 使用率「未定義」,HPA 不會針對這個指標採取任何擴縮動作(見[官方文件](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/#algorithm-details))。這把第 5 節與這節串起來了。
 >
 > 補充:HPA 改「Pod 數量」(水平);VPA 改「單一 Pod 的 requests/limits」(垂直);Cluster Autoscaler 改「節點數量」。三者解決不同層級。
+>
+> **版本補充:HPA Scale to Zero(v1.37 Beta,預設啟用)**。過去 HPA 的 `spec.minReplicas` 至少要是 1,想「沒流量時整組砍到 0 個 Pod」得靠 KEDA 之類的外部方案。[KEP-2021](https://github.com/kubernetes/enhancements/blob/master/keps/sig-autoscaling/2021-scale-from-zero/README.md) 讓這件事原生內建進 HPA:只要指標來源是**自訂 (object) 或外部 (external) 指標**(用 CPU/記憶體這類「resource metrics」不行,因為沒有活著的 Pod 就量不到用量),就能把 `minReplicas` 設成 `0`——沒負載時整組縮到 0,指標顯示需要至少一個副本時再拉起來;縮到 0 時 HPA 會帶上狀態條件 `ScaledToZero: True`。此功能已於 **Kubernetes v1.37** 晉升 **Beta 且預設開啟**,詳見官方部落格〈[Scale Workloads to Zero with HorizontalPodAutoscaler](https://kubernetes.io/blog/2026/09/02/kubernetes-v1-37-hpa-scale-to-zero-beta/)〉與〈[HorizontalPodAutoscaler 官方文件](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/)〉。EKS 上要用到這個版本,仍需等 EKS 正式上架支援 1.37(見 [02-eks 章節](../02-eks/README.md)的版本上架時程說明)。
 
 ---
 
