@@ -83,6 +83,8 @@ spec:
 - **`fsGroup`**:這個比較特別。它讓掛載進來的 Volume,其檔案的**群組擁有權**被設成指定 GID,並把該 GID 加進容器行程的**補充群組 (supplementary group)**。
 
 > 🔑 **`fsGroup` 解決的痛點**:你以非 root (UID 1000) 跑容器,但掛進來的 PersistentVolume 裡的檔案屬於 root,結果你的程式**沒權限寫**(回想 rwx 模型:不是擁有者、不在群組,就只剩 others 的權限)。`fsGroup` 讓 K8s 在掛載時把 Volume 內容的群組改成 2000,而你的行程也屬於群組 2000,於是就能讀寫了([官方文件](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#configure-volume-permission-and-ownership-change-policy-for-pods))。**這就是 Linux 檔案權限 (rwx) 與群組概念在 K8s 儲存上的直接應用。**
+>
+> **版本補充:`SELinuxMount` 於 Kubernetes v1.37 晉升 GA 且預設啟用,是升級時的重要斷點**。這個欄位控制的是**同一類「掛載時調整 Volume 權限」問題,但換成 SELinux 標籤**:`securityContext.seLinuxOptions` 若指定了標籤,kubelet 過去多半要對整個 Volume **遞迴重新標記 (recursive relabeling)** 每一個檔案,Volume 越大、Pod 啟動就越慢。`SELinuxMount` 啟用後,kubelet 改用**掛載當下**(mount-time)直接以該標籤掛載(需底層檔案系統支援 `-o context=`,如 ext4/xfs),不必逐檔案重寫,大幅加快啟動與減少 I/O。**但這也是官方在 release note 中特別點名的升級風險**:某些先前依賴遞迴重新標記行為(例如同一個 Volume 被多個不同 SELinux 標籤的 Pod 共用)的叢集,升到 v1.37 後可能出現非預期的存取失敗。若你的叢集有啟用 SELinux(多數 Bottlerocket/EKS 節點預設如此),升級前務必評估;官方提供了在 v1.36 上先行檢查受影響工作負載的指引。詳見官方部落格〈[SELinux Volume Label Changes goes GA (and likely implications in v1.37)](https://kubernetes.io/blog/2026/04/22/breaking-changes-in-selinux-volume-labeling/)〉與 [Kubernetes v1.37 release notes](https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/)。
 
 ```bash
 kubectl apply -f id-demo.yaml
@@ -440,6 +442,8 @@ spec:
 ```
 
 > 為什麼重要?即使容器內某行程是 root,只要逃逸出去,在**主機**眼中它只是個沒權限的普通使用者——逃逸的傷害大幅降低。這是 `runAsNonRoot` 之外的**第二道保險**(就算非 root 沒做到,user namespace 還擋一層)。這個功能在 [v1.36 進入 stable 並預設啟用](https://kubernetes.io/docs/concepts/workloads/pods/user-namespaces/);若你的叢集版本較舊,啟用前務必查該版本文件確認支援度與限制(例如某些 Volume 類型、節點 CRI 版本的相容性)。
+>
+> **這只是 Pod 層級的 user namespace,節點元件本身仍是特權行程——`KubeletInUserNamespace`(俗稱 rootless mode)補上另一半**。上面的 `hostUsers: false` 只讓「容器內的行程」映射到主機非特權 UID,但 kubelet、CRI/OCI runtime、CNI 外掛、kube-proxy 這些**節點元件自己**傳統上仍以 root 執行。`KubeletInUserNamespace` 於 **Kubernetes v1.37 晉升 Beta 且預設啟用**,讓整組節點元件也能在 Linux user namespace 內、以非特權 host 使用者身分運作——等於把「降權」從 Pod 內部延伸到節點元件本身,萬一節點元件被攻破,主機看到的攻擊者一樣只是個普通使用者。`kubectl get nodes -o yaml` 現在會回報 `runningInUserNamespace` 欄位標示節點是否以此模式運作。這個功能與本節的 Pod 層級 user namespace 互補而非取代——兩者分別保護「容器逃逸」與「節點元件被攻破」兩種不同情境。詳見官方部落格〈[KubeletInUserNamespace Graduates to Beta](https://kubernetes.io/blog/2026/09/04/kubernetes-v1-37-rootless-beta/)〉。
 
 ### 10.2 不要自動掛 ServiceAccount token
 
@@ -456,6 +460,16 @@ spec:
 - **最小基底映像 (minimal base image)**:用 `distroless`、`alpine` 或 scratch 這類精簡映像。映像裡**東西越少,攻擊面越小**——沒有 shell、沒有套件管理器,攻擊者進來後幾乎無工具可用。這也讓 `readOnlyRootFilesystem` 更容易達成。
 
 > 這幾項屬於供應鏈安全 (supply chain security) 與映像建置的範疇,會在容器 / Docker 與 CI/CD 相關章節展開,這裡先連起來。
+
+### 10.4 版本補充:內建工作負載身分——Pod Certificates 與 ClusterTrustBundle(v1.37 GA)
+
+前面幾節談的都是「限制容器能做什麼」;這裡談一個新的正交問題:**容器要跟其他服務做 mTLS 時,證書從哪來?** 過去常見做法是自建 cert-manager 之類的方案簽發、或把私鑰塞進 Secret——多一套要維運的元件、也多一份要小心保管的密鑰。
+
+**Pod Certificates**(於 **Kubernetes v1.37 晉升 GA**)把 X.509 憑證簽發直接內建進核心:Pod 在 `volumes` 宣告一個 `podCertificate` 投影磁碟區、指定一個**簽發者名稱 (signer name)**,kubelet 會建立對應的 `PodCertificateRequest` 物件;叢集管理者部署的簽發控制器 (signer controller) 監看這些請求、簽發憑證後寫回,kubelet 再把憑證**掛載進容器檔案系統**,並在到期前自動更新——容器啟動前就已經備妥。
+
+搭配的 **ClusterTrustBundle**(`certificates.k8s.io/v1` API 群組)則解決另一半問題:簽發者要如何把「信任錨點 (trust anchor,即 CA 憑證)」分發給所有需要驗證它的 Pod?過去常見做法是把 CA 憑證複製進每個 namespace 各一份 ConfigMap;`ClusterTrustBundle` 是叢集層級的物件,Pod 可用 `clusterTrustBundle` 投影磁碟區直接掛載,不必逐 namespace 複製維護。
+
+> 這與服務網格 (Service Mesh,如 Istio/Linkerd) 長期在做的「自動 mTLS」目標相同,差別是**這次是核心原生機制**,不必整套服務網格才能取得工作負載身分憑證——對還沒上服務網格、但想要 Pod 對 Pod mTLS 的場景是更輕量的選項。詳見官方部落格〈[Kubernetes v1.37: Pod Certificates and Cluster Trust Bundles](https://kubernetes.io/blog/2026/08/28/kubernetes-v1-37-pod-certificates-and-cluster-trust-bundles/)〉。
 
 ---
 

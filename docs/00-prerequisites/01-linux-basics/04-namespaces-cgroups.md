@@ -203,6 +203,8 @@ cat /proc/$$/cgroup
 | `<資源>.max` / `.current` / `.stat` / `.events` | 各控制器的「上限 / 目前用量 / 統計 / 事件計數」 |
 
 > ⚠️ **v2 的「統一階層」**:cgroup v1 每種資源各有一棵樹(`/sys/fs/cgroup/memory/`、`/cpu/`…);v2 只有**一棵樹**,一個群組同時掌管所有資源。現代發行版(systemd)預設都是 v2,可用 `stat -fc %T /sys/fs/cgroup/` 確認(顯示 `cgroup2fs` 就是 v2)。
+>
+> **這對 K8s 使用者不只是「概念差異」,現在是真的會擋你開機的事**:kubelet 設定 `failCgroupV1` 自 **v1.35** 起預設為 `true`,意思是節點若偵測到還在用 cgroup v1、且沒有明確設定 `failCgroupV1: false` 覆寫,**kubelet 會直接拒絕啟動**(錯誤訊息類似「kubelet is configured to not run on a host using cgroup v1」),而不只是印個警告。**Kubernetes v1.37** 延續這個路線,cgroup v1 支援已進入軟性淘汰狀態(程式碼還在但不再測試),完全移除預計在未來版本發生。這也是為什麼像 `memory.max`/`memory.high` 這類本節後面會教的細膩資源控制,以及 K8s 的記憶體 QoS (Memory QoS)、In-Place Pod Resize 等特性,都**只在 cgroup v2 上運作**——upstream 已經不再投資 v1 相容性。實務建議:確認你的節點作業系統(`stat -fc %T /sys/fs/cgroup/` 顯示 `cgroup2fs`)與容器執行環境都已預設 v2,升級叢集前先排除仍在用 v1 的舊節點映像。詳見 [Kubernetes v1.37 release notes](https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/) 與 [KEP-5573: Remove cgroup v1](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/5573-remove-cgroup-v1/README.md)。
 
 各控制器最常用的檔案:
 

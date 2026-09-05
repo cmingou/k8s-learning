@@ -234,6 +234,8 @@ spec:
 
 光有固定 IP 還不夠好用——我們希望用**名字**互相呼叫。叢集裡跑著 **CoreDNS**(在 `kube-system` 命名空間),它是叢集的 DNS 伺服器。每個 Service 一建立,CoreDNS 就為它登記一筆 DNS 紀錄。
 
+> **版本補充:舊的 kube-dns 已於 v1.37 正式棄用**。CoreDNS 自 **v1.13** 起就已是預設的叢集 DNS 附加元件,但更早期的 `kube-dns`(基於 dnsmasq)實作一直留在核心程式碼庫裡沒被移除——它跟不上後來的功能演進(例如不支援 EndpointSlice、雙堆疊 (dual-stack) Service),多年來實務上幾乎沒有叢集還在用。**Kubernetes v1.37** 正式將 `kube-dns` 標示為棄用,預期 **v1.40** 之後不再產出新的 `kube-dns` 套件。這對本節的教學內容沒有影響——CoreDNS 本來就是這裡唯一介紹、也是你會在真實叢集看到的實作;這則純粹是「如果你在舊文件或舊叢集看到 kube-dns 這個名字,那是被取代的前代方案」的釐清。詳見官方發布公告〈[Kubernetes v1.37: Garhwal](https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/)〉。
+
 ### 4.1 DNS 命名規則
 
 Service 的完整域名 (FQDN) 格式:
