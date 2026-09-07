@@ -579,6 +579,8 @@ spec:
 - **專用節點**:給 GPU 節點打汙點,只有需要 GPU 且帶對應容忍的 Pod 能上去,一般 Pod 不會浪費這些昂貴節點。
 - **控制平面節點**:`kubeadm` 建立的 control-plane 節點預設帶汙點 `node-role.kubernetes.io/control-plane:NoSchedule`,所以你的應用 Pod 不會被排到大腦上(見[官方文件 Creating a cluster with kubeadm — Control plane node isolation](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#control-plane-node-isolation))。DaemonSet(第 2 章)若要連 control-plane 也跑,就得加容忍。
 
+> **版本補充:GPU 這類特殊硬體,新專案該用 Dynamic Resource Allocation (DRA) 而非只靠 Taint**。上面的汙點/容忍只解決「哪些 Pod 能上這台節點」的粗粒度問題;它不知道節點上究竟有幾張 GPU、型號是什麼、能不能被多個 Pod 分時共用。**DRA** 是 K8s 原生設計來處理這類「結構化裝置請求」的機制,核心 API(`resource.k8s.io/v1`,含 `DeviceClass`、`ResourceClaim`、`ResourceClaimTemplate`、`ResourceSlice` 等物件)已於 **v1.34 GA、v1.35 起功能閘門鎖定為預設開啟(無法關閉)**:硬體廠商的 DRA driver 在每個節點發布可用裝置清單(`ResourceSlice`),Pod 透過 `ResourceClaim` 描述「我要什麼樣的裝置」,由 kube-scheduler 內建的 DynamicResources 外掛去比對、指派實際裝置——概念上更接近「這顆 GPU 有沒有支援某種特性、能否切片分享」的細緻宣告,而不是 Taint 那種「有或沒有通行證」的二分法。**Kubernetes v1.37** 進一步讓 **DRA Extended Resource support 晉升 GA**:DRA driver 現在可以直接滿足傳統 Extended Resource API(像 Pod spec 裡的 `example.com/gpu`)發出的請求,不必額外部署一支 device plugin 銜接兩套機制。這是一個平行於 Taint/Toleration 的**進階**主題,大型 GPU/AI 訓練叢集才會用到,這裡先建立概念連結,細節超出本節範圍。詳見官方部落格〈[Kubernetes v1.34: DRA has graduated to GA](https://kubernetes.io/blog/2025/09/01/kubernetes-v1-34-dra-updates/)〉與〈[Kubernetes v1.37: DRA Updates](https://kubernetes.io/blog/2026/09/03/kubernetes-v1-37-dra-updates/)〉。
+
 ### Affinity 與 Taint/Toleration 對照
 
 | 機制 | 誰主動 | 語意 | 沒滿足時 |
