@@ -28,7 +28,7 @@
 
 把 Helm 想成 K8s 世界的 `apt` 或 `npm`:你不會手刻一個資料庫的所有 YAML,而是 `helm install` 一個現成的**套件 (package)**。這個套件在 Helm 裡叫 **Chart**。
 
-> **版本現況**:[Helm v4.0.0 已於 2025-11-12 GA](https://helm.sh/blog/helm-4-released/),是目前的主線大版本(截至 2026-08 最新為 v4.2.4);v3 仍平行維護修補版(v3.21.4)供尚未遷移的使用者過渡,實際最新版請查 [Helm Releases](https://github.com/helm/helm/releases)。本章示範的指令(`upgrade`/`rollback`/`template`/`repo`)在 v3、v4 皆可直接使用、行為未變;但 `helm install` 在 v4 預設改用 **server-side apply**(v3 預設是 client-side apply,既有 Helm 3 建立的 release 升級後仍沿用原本方式),另有少數旗標改名(如 `--atomic` → `--rollback-on-failure`)與外掛式 post-renderer 等進階變更,詳見 [Helm 4 Overview — Breaking Changes](https://helm.sh/docs/overview/#breaking-changes)。
+> **版本現況**:[Helm v4.0.0 已於 2025-11-12 GA](https://helm.sh/blog/helm-4-released/),是目前的主線大版本(截至 2026-08 最新為 v4.2.4)。Helm v3 已進入收尾階段:[官方公告](https://helm.sh/blog/helm-v3-end-of-life/)指出 v3 的最後一個功能版本 v3.22.0 於 **2026-09-09** 釋出(僅同步 Kubernetes client library 相容性,不再 backport 其他功能),之後 v3 只接受安全性修補,支援期延長至 **2027-02-10** 為止,屆時 v3 將完全停止維護;因此尚未遷移的使用者應盡快規劃升級至 v4。實際最新版請查 [Helm Releases](https://github.com/helm/helm/releases)。本章示範的指令(`upgrade`/`rollback`/`template`/`repo`)在 v3、v4 皆可直接使用、行為未變;但 `helm install` 在 v4 預設改用 **server-side apply**(v3 預設是 client-side apply,既有 Helm 3 建立的 release 升級後仍沿用原本方式),另有少數旗標改名(如 `--atomic` → `--rollback-on-failure`)與外掛式 post-renderer 等進階變更,詳見 [Helm 4 Overview — Breaking Changes](https://helm.sh/docs/overview/#breaking-changes)。
 
 ### 2.1 三個核心概念:Chart / Values / Release
 
