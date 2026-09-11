@@ -327,6 +327,8 @@ kubectl describe pod my-pod | grep -A5 "Requests:"
 
 📖 **官方文件**:[Resize CPU and Memory Resources assigned to Containers](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/)
 
+> **版本補充:v1.37 把 In-Place Resize 擴大到原生 sidecar(restartable init container)**。1.35 GA 的範圍只涵蓋一般主容器;**`InPlacePodVerticalScalingInitContainers` 已於 v1.37 GA**,現在 `restartPolicy: Always` 的原生 sidecar(見 `06-pod-lifecycle.md` 第 7 節)也能就地調整資源——但一般(非 restartable)init 容器與 ephemeral container 仍然**不支援**,官方文件明確寫著「sidecar containers can be resized. Non-restartable init containers and ephemeral containers cannot.」。v1.37 同時新增 **`InPlacePodVerticalScalingSchedulerPreemption`(Alpha)** 功能閘門:過去節點資源不夠時,resize 請求只能卡在 `PodResizePending`(`reason: Deferred`);這個新閘門讓排程器能主動搶佔低優先權的 Pod 去騰出空間,讓高優先權工作負載的 resize 請求可以成功套用。詳見 [Resize CPU and Memory Resources assigned to Containers](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/) 與 [Kubernetes v1.37: Garhwal](https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/)。
+
 ### 7.1.1 進階:Pod 層級資源的就地垂直擴縮(K8s 1.36 Beta)
 
 上面談的 In-Place Resize,改的都是**單一容器**的 `resources`。K8s 另外還有一條平行的演進路線,管的是**整個 Pod**的資源:

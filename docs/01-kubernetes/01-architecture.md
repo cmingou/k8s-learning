@@ -178,6 +178,8 @@ flowchart TB
 
 每個控制器都在跑「觀察 → 比對 → 行動」。把它們集中在一個程序只是為了部署方便,概念上它們是獨立的。
 
+> **版本補充:v1.37 新增 Node Lifecycle Conditions(Alpha)**。上面 Node Controller 目前只看「節點有沒有失聯」這種粗粒度訊號;**節點正在被驅逐維護、還是真的壞了**,過去沒有標準化的方式表達。v1.37 透過新的 **`NodeLifecycleConditions`** 功能閘門(**Alpha,預設關閉**)引入 5 個標準 Node conditions:`DrainInProgress`、`Drained`、`MaintenancePlanned`、`MaintenanceInProgress`、`GracefulNodeShutdownInProgress`,讓叢集自動化工具(例如雲端的節點維護流程)能用一致的欄位回報「這台節點正在被排空/維護」,而不用各自發明客製欄位。**注意**:v1.37 階段這個閘門本身是空操作(no-op)——它不限制誰能設定這些 condition,K8s 核心元件目前也不會讀取或依據它們採取行動,純粹是先把欄位定義出來,供未來版本的控制器使用。詳見官方部落格〈[Kubernetes v1.37: Introducing Node Lifecycle Conditions](https://kubernetes.io/blog/2026/09/09/kubernetes-v1-37-node-lifecycle-conditions/)〉。
+
 ### 3.5 cloud-controller-manager — 對接雲端(選用)
 
 如果叢集跑在雲上(AWS / GCP / Azure),這個元件負責把 K8s 概念翻譯成雲端資源:建立 LoadBalancer、掛載雲端磁碟、管理節點生命週期。本機學習(kind / minikube)通常沒有它。
