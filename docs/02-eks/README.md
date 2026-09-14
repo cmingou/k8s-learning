@@ -51,7 +51,7 @@
 
 | 項目 | EKS (AWS) | GKE (Google) | AKS (Azure) |
 |---|---|---|---|
-| Control Plane 收費 | **按小時收費**([標準支援 (Standard Support) $0.10/hr;過了 14 個月後自動進入延伸支援 (Extended Support),漲到 $0.60/hr](https://aws.amazon.com/eks/pricing/)) | Autopilot/Standard 各有計價,有一個免費叢集額度 | 標準層免費,進階 SLA 收費 |
+| Control Plane 收費 | **按小時收費**([標準支援 (Standard Support) $0.10/hr;過了 14 個月後自動進入延伸支援 (Extended Support),漲到 $0.60/hr](https://aws.amazon.com/eks/pricing/)) | Autopilot/Standard 各有計價,有一個免費叢集額度 | [**Free** 層免費(無 SLA 保證);**Standard** 層 $0.10/hr(內建 Uptime SLA,單一可用區 99.9%、跨可用區 99.95%);**Premium** 層 $0.60/hr(SLA 同 Standard,並含 24 個月長期支援 LTS)](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers) |
 | 預設體驗 | 偏「組裝」,彈性高、要自己接很多東西 | 偏「開箱即用」,自動化程度公認最高 | 介於兩者之間 |
 | 與雲整合 | IAM、VPC、ALB/NLB、EBS/EFS… | IAM、VPC、Cloud LB… | Entra ID、VNet… |
 
