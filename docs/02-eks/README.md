@@ -1010,6 +1010,7 @@ eksctl update addon --name kube-proxy --cluster my-first-eks
 | 資源 | 計費方式 | 備註 |
 |---|---|---|
 | **[EKS Control Plane](https://aws.amazon.com/eks/pricing/)** | **按小時**(標準支援 $0.10/hr/叢集;延伸支援 $0.60/hr/叢集) | 叢集一存在就扣,跟你用不用無關;版本進入延伸支援後費用會跳漲 |
+| **[EKS Provisioned Control Plane](https://docs.aws.amazon.com/eks/latest/userguide/eks-provisioned-control-plane.html)**(選配) | 在上述控制平面費用**之外**,依 scaling tier 額外按小時計費:**XL $1.65/hr、2XL $3.40/hr、4XL $6.90/hr、8XL $13.90/hr**(超過 8XL 需洽 AWS 帳戶團隊) | 只有明確選用（見 1.1 節說明）才會產生,一般練習用不到,但大規模叢集容易忘記關閉 |
 | **Worker Node (EC2)** | 按 EC2 機型小時 + EBS | 節點越多越貴;Spot 較便宜 |
 | **Fargate** | 按 Pod 的 vCPU/記憶體 | 跑越久越貴 |
 | **ALB / NLB** | 每個 LB 按小時 + 流量 (LCU) | Ingress/Service 殘留會讓 LB 殘留 |
