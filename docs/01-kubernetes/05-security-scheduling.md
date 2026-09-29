@@ -130,6 +130,8 @@ kubectl auth can-i delete pods --as=system:serviceaccount:dev:app-sa -n dev # no
 
 > **Role vs ClusterRole 怎麼選?** 權限只在單一 Namespace → Role。需要跨 Namespace、或操作叢集級資源(nodes、persistentvolumes、namespaces 本身)→ ClusterRole。常見技巧:用 ClusterRole 定義「可重用的權限集」,再用 RoleBinding 把它限縮綁到特定 Namespace。
 
+> **安全公告(2026-09-23):CVE-2026-2270 — 只給了 Namespace 內權限,結果能建到別的 Namespace 去**。這是一個很好的「RBAC 授權範圍 ≠ 實際影響範圍」教材案例:`kube-controller-manager` 的 StatefulSet controller 在依 `ControllerRevision` 復原(rollback)Pod 樣板時,曾經把整個 `ControllerRevision.Data` 內容(而不是只取 `spec` 欄位)拿去重建 Pod——如果攻擊者只在自己的 Namespace 裡對 `StatefulSet` 與 `ControllerRevision` 有寫入權限(這在多租戶叢集是常見的、看似很「小」的授權),就能精心構造 `ControllerRevision` 的內容,讓 controller 依此建立一個**指定到其他 Namespace**、且中繼資料 (metadata) 與 Pod spec 都由攻擊者控制的 Pod,形成一次典型的**混淆代理人攻擊 (confused deputy attack)**——濫用了 `kube-controller-manager` 這個高權限元件替它「代勞」建立本來建不到的資源。CVSS 5.9(Medium,`AV:N/AC:H/PR:H/UI:N/S:U/C:H/I:H/A:N`);影響 `kube-controller-manager` ≤ v1.34.11 / ≤ v1.35.8 / ≤ v1.36.4 / = v1.37.0,已於 **v1.34.12、v1.35.9、v1.36.5、v1.37.1** 修補,修法是把 ControllerRevision 復原動作限縮成**只還原 `spec` 欄位**。實務上跨 Namespace 建立的 Pod 預設會被垃圾回收機制立刻清掉,除非攻擊者能進一步偽造一個指向受害 Namespace 內**現有** StatefulSet UID 的 `OwnerReference`,所以真實可利用性仍需搭配額外條件,但這正是為什麼**最小權限原則**要延伸到「這個資源的寫入權限,會不會被某個控制器用來間接影響別的 Namespace」這種二階效應,而不是只看資源本身的 Namespace 範圍。詳見 [Kubernetes 官方 CVE Feed](https://kubernetes.io/docs/reference/issues-security/official-cve-feed/)(逐日更新的官方清單)與 [kubernetes/kubernetes#142097](https://github.com/kubernetes/kubernetes/issues/142097)(已由 K8s Security Response Committee 成員 Maciej Szulik、Filip Křepinský 等人公開協調揭露的追蹤 issue,含完整版本與修補資訊)。
+
 ---
 
 ## 第二部分:資源管理與健康 (Resources & Health)
