@@ -933,6 +933,19 @@ spec:
 
 > 這兩項能力同時適用於 **EKS Auto Mode**(NodeClass,`eks.amazonaws.com/v1`)與開源 **Karpenter**(NodePool/EC2NodeClass,欄位命名與 apiVersion 略有差異),詳見官方文件:[Create a Node Class for Amazon EKS — Static Network Interface Configuration](https://docs.aws.amazon.com/eks/latest/userguide/create-node-class.html#static-network-interfaces)、[Karpenter NodeClasses — spec.networkInterfaces](https://karpenter.sh/docs/concepts/nodeclasses/#specnetworkinterfaces)。
 
+### 7.6 節點池新能力:進階運算設定 advancedCompute(2026-10 新功能)
+
+> **來源**:[AWS 官方公告(2026-10)](https://aws.amazon.com/about-aws/whats-new/2026/10/eks-auto-mode-advanced-compute-config/)、[Create a Node Class for Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/create-node-class.html)
+
+在此之前,**EKS Auto Mode** 的賣點之一同時是它的限制:節點完全由 AWS 代管,你拿不到 kubelet 參數、核心 (kernel) sysctl、hugepages 這類「貼近節點作業系統」的調校旋鈕(這也是上方 7.3 節表格裡「不支援自訂 AMI / 直接 SSH」的延伸)。2026-10 新增的 **`advancedCompute`** 欄位,在**不破壞 Auto Mode 代管模式**的前提下開了一道口子,讓你能透過 **NodeClass** 宣告式地設定:
+
+- **kubelet 設定**:例如節點資源驅逐門檻 (eviction thresholds)、容器日誌輪替 (container log rotation) 相關參數。
+- **核心 sysctl**:例如網路與 ARP 快取相關的核心參數。
+- **Hugepages**:支援 `2Mi`、`1Gi` 兩種分頁大小,可靜態保留 (static) 或視需求配置,兩者可分別或同時使用——這對資料庫、記憶體密集運算 (memory-intensive workload) 或部分 GPU/機器學習工作負載的效能調校很關鍵,在此功能推出前,Auto Mode 使用者完全無法設定。
+- **User namespaces** 等其他節點層級選項。
+
+這些設定一樣走 Kubernetes API 宣告式套用:EKS Auto Mode 會驗證設定、在節點開機時套用,並在**擴縮與版本升級**過程中持續維持該設定——你不需要、也不能直接 SSH 進節點手動調整。**注意**:內建的 `default` NodeClass/NodePool 仍由 AWS 管理、不應編輯,要用這些進階設定請建立**自訂的 NodeClass**(命名不可為 `default`)。詳細欄位定義請以官方文件的 NodeClass API 參考為準。
+
 ### 動手練習 7
 
 1. 用 `eksctl create nodegroup` 額外加一個 Spot 機型的 Node Group,觀察 Spot 與 On-Demand 的價差。
@@ -1136,6 +1149,7 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我知道 Container Insights / Control Plane Logging 會產生費用。
 - [ ] 我知道目前 Managed Node Group 預設 AMI 是 AL2023,AL2 已停止發布新 AMI。
 - [ ] 我知道 EKS Auto Mode 與 Karpenter 節點池現在可直接宣告 EFA 網路介面與 EC2 Placement Group(cluster/spread/partition),適合分散式訓練/推論工作負載(見 7.5 節)。
+- [ ] 我知道 EKS Auto Mode NodeClass 現在可透過 `advancedCompute` 設定 kubelet 參數、核心 sysctl 與 hugepages,但內建的 `default` NodeClass/NodePool 不受影響也不應編輯(見 7.6 節)。
 
 **成本與清理(保命)**
 - [ ] 我在練習前就設好了 AWS Budget 告警。
