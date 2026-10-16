@@ -667,6 +667,8 @@ spec:
 
 > `WaitForFirstConsumer` 這個設定很重要:它讓 EBS 直到「Pod 被排到某個 AZ」之後才建立,確保 EBS 跟 Pod 在**同一個 AZ**,避免掛載失敗。
 
+> **補充:EKS Auto Mode 的 EBS 磁碟區線上修改方式即將變更(2026-09-14 公告棄用,2026-10-31 生效)**。社群的 `volume-modifier-for-k8s` sidecar 讓你在 PVC 上貼 annotation(例如 `ebs.csi.aws.com/volumeType`、`ebs.csi.aws.com/iops`、`ebs.csi.aws.com/throughput`)就能線上修改已建立 EBS 磁碟區的類型/IOPS/傳輸量,不必重建 PV;**EKS Auto Mode** 本身不能自行安裝 sidecar,過去是靠 AWS 內建同一套 annotation 機制提供等效功能。AWS 已宣布棄用 `volume-modifier-for-k8s`,改以 Kubernetes 原生的 **VolumeAttributesClass(VAC,`storage.k8s.io/v1`,透過 PVC 的 `spec.volumeAttributesClassName` 欄位指定)**取代,**2026-10-31 起 EKS Auto Mode 將不再支援**上述 annotation 修改方式。VAC 目前已可在**搭配 Kubernetes 1.34 以上的 EKS Auto Mode** 叢集使用;若叢集版本較舊、或 PVC 還在用這些 annotation,應儘快改寫成 VAC 物件,否則該日期後對 Auto Mode 叢集下對應的 annotation 修改將不再生效(標準 EKS 若仍相依此 sidecar,也建議同步規劃遷移)。詳見 [EKS Auto Mode release notes](https://docs.aws.amazon.com/eks/latest/userguide/auto-change.html)、AWS 官方部落格〈[Modify Amazon EBS volumes on Kubernetes with Volume Attributes Classes](https://aws.amazon.com/blogs/containers/modify-amazon-ebs-volumes-on-kubernetes-with-volume-attributes-classes/)〉。
+
 ### 6.3 EFS(多 Pod 共享)
 
 ```yaml
