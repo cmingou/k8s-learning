@@ -370,6 +370,8 @@ kubectl patch pod shared-pool-app --subresource resize --patch \
 
 📖 **官方文件**:[Kubernetes v1.36: In-Place Vertical Scaling for Pod-Level Resources (Beta)](https://kubernetes.io/blog/2026/04/30/kubernetes-v1-36-inplace-pod-level-resources-beta/)
 
+> **另一條相關但不同的演進路線:Pod-Level Resource Managers(v1.36 Alpha → v1.37 Beta)**。這跟上面「就地調整 Pod 層級聚合資源預算」是兩件事——上面講的是**改資源數值**(resize);這裡講的是 **kubelet 的資源管理器(Topology / CPU / Memory Manager)在節點內做放置決策時,要不要改看 Pod 層級的聚合 `spec.resources`,而非只看每個容器各自的 `resources`**。啟用後(feature gate `PodLevelResourceManagers`,**v1.37 仍預設關閉**,需叢集管理員在相關元件上手動開啟),主容器可以拿到 NUMA 對齊的獨占核心,sidecar 則共用同一個 Pod 專屬的核心池,不必再各自向 CPU/Memory Manager 要求獨立配額;PodResources gRPC API 也新增了 Pod 層級欄位(如聚合的 `cpu_ids`、`memory`),讓監控工具不會重複計算容器配額。此功能僅支援 Linux 節點,且要求 CPU Manager 設為 `static` 政策、Memory Manager 設為 `Static` 政策,不支援 BestEffort 的 Memory Manager 行為。詳見官方文件〈[Pod-level resource managers](https://kubernetes.io/docs/reference/node/pod-level-resource-managers/)〉與部落格〈[Kubernetes v1.37: Pod-Level Resource Managers graduated to Beta](https://kubernetes.io/blog/2026/09/15/kubernetes-v1-37-pod-level-resource-managers-beta/)〉。
+
 ---
 
 ## 7.2 PodDisruptionBudget(PDB):主動中斷保護
