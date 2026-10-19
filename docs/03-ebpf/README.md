@@ -769,6 +769,8 @@ eBPF 的功能與核心版本**強相關**。各功能登場的大致里程碑(�
 > 上述 **CVE-2026-98589/98590/98628/98641/98644/98799/98860** 共 7 筆,皆於 2026-10-18 隨 Linux 核心官方 CVE 批次公告公布(CNA: Linux),核心描述、受影響版本與修補 commit 均已對照官方 CVE Program 記錄(經 CVEProject/cvelistV5 鏡像)逐筆核實,commit hash 取自官方記錄的 references 欄位,未假設或臆測;因公布時間極新,Ubuntu Security Notices 尚未個別收錄,故以 CVEProject/cvelistV5 官方記錄頁面作為連結來源。CVE-2026-74612(CVSS 10.0)仍是本節收錄清單中嚴重度最高的一筆,不受影響;本次新增案例均未見官方公布 CVSS 分數,排序無需調整。
 >
 > **2026-10-18 複查**:新增上述 2026-10-18 公布的 7 筆 CVE。同時對 2026-05-27 批次再次回頭複查,發現先前仍遺漏 **CVE-2026-45927**(`bpf_map_get_info_by_fd()` 未要求 map 已 freeze 即可計算雜湊,形成 TOCTOU),已補齊如上。CVE-2026-74612(CVSS 10.0)仍是本節收錄清單中嚴重度最高的一筆,不受影響。
+>
+> **2026-10-19 複查**:確認 Ubuntu Security Notices 與 CVEProject/cvelistV5 均無 2026-10-18 之後的新 kernel/bpf CVE 批次公告。上一輪(2026-10-17)記錄 Linux 7.3 停在 rc7、「正式發布時程仍未定案」——現已核實 **Linus Torvalds 已於 2026-10-18 正式標記 `v7.3` 發布**(如期在 rc7 公告的預定日發布,未再加開 rc8),詳見 [Linux 核心原始碼 `v7.3` 標籤](https://github.com/torvalds/linux/releases/tag/v7.3)。CVE-2026-74612(CVSS 10.0)仍是本節收錄清單中嚴重度最高的一筆,不受影響。
 
 ```bash
 # 檢查核心版本
