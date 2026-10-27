@@ -760,7 +760,7 @@ spec:
 >
 > **新選項:`Balanced`**。除了範例中的 `WhenEmptyOrUnderutilized`,EKS Auto Mode 於 **2026-07-27** 新增了 `consolidationPolicy: Balanced`——它會同時權衡「整併省下的運算成本」與「整併造成的中斷成本」再決定是否收斂節點(只有在省下的成本大於中斷成本時才整併,因此通常**驅逐的 Pod 更少**),官方將其定位為 `WhenEmptyOrUnderutilized` 的升級路徑。詳見 [EKS Auto Mode 發布紀錄](https://docs.aws.amazon.com/eks/latest/userguide/auto-change.html)。
 >
-> **重要:預設值已變更**。隨 **Kubernetes 1.37**(EKS 於 2026-10-01 起支援)上線,**新建**的 EKS Auto Mode NodePool 若**未明確指定** `consolidationPolicy`,預設值已從 `WhenEmptyOrUnderutilized` 改為 `Balanced`;內建的 `general-purpose` 與 `system` NodePool 也已改用 `Balanced`,且**無法變更**這兩個內建 NodePool 的設定。既有 NodePool、或已明確指定策略的設定不受影響。若工作負載(例如長跑的 Job、GPU/Neuron/EFA 上的模型推論)依賴舊版較積極的整併行為,建議在自管 NodePool 上**明確**設定 `consolidationPolicy: WhenEmptyOrUnderutilized`,不要依賴預設值。
+> **重要:預設值已變更**。隨 **Kubernetes 1.37**([EKS 於 2026-10-13 公告支援](https://aws.amazon.com/about-aws/whats-new/2026/10/amazon-eks-distro-kubernetes-version-1-37/))上線,**新建**的 EKS Auto Mode NodePool 若**未明確指定** `consolidationPolicy`,預設值已從 `WhenEmptyOrUnderutilized` 改為 `Balanced`;內建的 `general-purpose` 與 `system` NodePool 也已改用 `Balanced`,且**無法變更**這兩個內建 NodePool 的設定。既有 NodePool、或已明確指定策略的設定不受影響。若工作負載(例如長跑的 Job、GPU/Neuron/EFA 上的模型推論)依賴舊版較積極的整併行為,建議在自管 NodePool 上**明確**設定 `consolidationPolicy: WhenEmptyOrUnderutilized`,不要依賴預設值。
 >
 > 該怎麼選?AWS 官方[最佳實踐指南](https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html)給的是「依工作負載特性」而非一律建議 Karpenter:負載忽高忽低、機型需求多樣就選 Karpenter;負載穩定單純,Node Group + CA 一樣夠用且更省心。
 
