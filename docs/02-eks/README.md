@@ -413,6 +413,23 @@ aws eks create-pod-identity-association \
 
 > eksctl 也提供整合指令 `eksctl create podidentityassociation`,可一次建好 IAM 角色、信任政策與關聯,用法類似 `eksctl create iamserviceaccount`。詳見 [eksctl 官方文件](https://docs.aws.amazon.com/eks/latest/eksctl/pod-identity-associations.html)。
 
+**原理:與 IRSA 的關鍵差異在「誰去跟 AWS 換憑證」**(詳見官方〈[Understand how EKS Pod Identity works](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-how-it-works.html)〉)。IRSA 是 Pod 裡的 AWS SDK 自己拿 OIDC Token 向 STS 呼叫 `AssumeRoleWithWebIdentity`;Pod Identity 則是改由節點上的 **Pod Identity Agent**(以 DaemonSet 執行,每個節點一個)代勞,SDK 只需透過環境變數(`AWS_CONTAINER_CREDENTIALS_FULL_URI`)連到本機的 Agent 端點即可,完全不碰 OIDC:
+
+```mermaid
+sequenceDiagram
+    participant Pod
+    participant Agent as EKS Pod Identity Agent(DaemonSet)
+    participant EKSAuth as EKS Auth API
+    participant IAM as IAM Role(信任 pods.eks.amazonaws.com)
+    Pod->>Agent: AWS SDK 依環境變數連到本機 Agent 端點
+    Agent->>EKSAuth: AssumeRoleForPodIdentity(帶叢集 / namespace / SA 身分)
+    EKSAuth->>IAM: 核對 Pod Identity Association + IAM 信任政策
+    IAM-->>EKSAuth: 通過
+    EKSAuth-->>Agent: 回傳臨時 AWS 憑證
+    Agent-->>Pod: 透過本機端點回傳給 SDK
+    Pod->>Pod: 用臨時憑證呼叫 S3 / DynamoDB
+```
+
 | 比較 | IRSA | Pod Identity |
 |---|---|---|
 | 是否需要 OIDC | 需要(每叢集一個) | 不需要 |
