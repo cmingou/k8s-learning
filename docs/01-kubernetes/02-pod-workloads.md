@@ -63,6 +63,21 @@ spec:
       image: my-app:1.0
 ```
 
+> **原生 sidecar 容器**:如果要的不是「跑完就結束」的初始化步驟,而是跟主容器**一起活到 Pod 結束**的輔助行程(例如日誌轉送、service mesh proxy),寫法一樣放在 `initContainers`,但多加一個 `restartPolicy: Always`:
+>
+> ```yaml
+> spec:
+>   initContainers:
+>     - name: log-shipper        # sidecar:先於主容器啟動,跟主容器一起活著
+>       image: log-shipper:1.0
+>       restartPolicy: Always    # 這個欄位讓它變成「原生 sidecar」而非一次性 init 容器
+>   containers:
+>     - name: app
+>       image: my-app:1.0
+> ```
+>
+> 這個機制(`restartPolicy: Always` 的 init 容器)在 Kubernetes **v1.28 進入 Alpha、v1.29 進入 Beta(預設啟用)、v1.33 正式 GA/stable**,是目前官方建議的 sidecar 寫法——它會在主容器之前啟動、持續運作,且在 Job 情境下**不會阻擋 Pod 視為完成**(主容器結束後,sidecar 會被自動終止)。詳見官方文件〈[Sidecar Containers](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/)〉。
+
 ---
 
 ## 2. 為什麼需要工作負載控制器 (Workload Controllers)
@@ -281,7 +296,7 @@ spec:
         - operator: Exists
       containers:
         - name: agent
-          image: fluent-bit:latest
+          image: fluent-bit:3.1.9  # 永遠釘版本,呼應第 1 節的建議——別用 latest
           volumeMounts:
             - name: varlog
               mountPath: /var/log

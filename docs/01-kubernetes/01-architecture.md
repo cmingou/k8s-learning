@@ -212,6 +212,12 @@ kubelet 是跑在**每一台節點上**的代理程式 (agent)。它的職責很
 
 kube-proxy 也跑在每台節點上,負責實作 **Service 的網路規則**。當你建立一個 Service,它會有一個虛擬 IP(ClusterIP),kube-proxy 在每台節點上設定 iptables 規則(Linux 目前的預設模式;另有 nftables 與已棄用的 IPVS 模式,各模式現況見第 3 章),讓送到這個虛擬 IP 的流量被導到後面真正的 Pod([kube-proxy 代理模式](https://kubernetes.io/docs/reference/networking/virtual-ips/#proxy-modes))。第 3 章會詳述。
 
+### 4.4 附加元件 (Addons):叢集的「第三類」元件
+
+官方文件把叢集元件分成三類:**控制平面元件**(第 2 節)、**節點元件**(第 4.1~4.3 節),以及**附加元件 (Addons)**——用一般的 K8s 物件(Deployment、DaemonSet 等)實作、但補上叢集必要功能的元件,其中官方特別點名「每個叢集都該有」的是**叢集 DNS**([Cluster Architecture](https://kubernetes.io/docs/concepts/architecture/#addons))。
+
+最常見的實作是 **CoreDNS**:它以 Deployment 跑在 `kube-system` namespace,讓 Pod 可以用 Service 名稱(例如 `my-svc.my-namespace.svc.cluster.local`)而不是要死記 ClusterIP 來互相呼叫——這就是為什麼下面的動手練習會叫你去 `kube-system` 找一個叫 `coredns` 的 Pod。除了 DNS,常見的附加元件還包括 **metrics-server**(供 `kubectl top` 與 HPA 使用的資源指標)與 Dashboard。附加元件不是 K8s 核心程式碼的一部分,而是「裝在」叢集上的一般工作負載,所以用你在第 2 節學到的 Deployment/DaemonSet 概念就能理解它們怎麼跑。
+
 ---
 
 ## 5. 完整劇本:一個 `kubectl apply` 發生了什麼?
