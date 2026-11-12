@@ -965,6 +965,24 @@ spec:
 
 這些設定一樣走 Kubernetes API 宣告式套用:EKS Auto Mode 會驗證設定、在節點開機時套用,並在**擴縮與版本升級**過程中持續維持該設定——你不需要、也不能直接 SSH 進節點手動調整。**注意**:內建的 `default` NodeClass/NodePool 仍由 AWS 管理、不應編輯,要用這些進階設定請建立**自訂的 NodeClass**(命名不可為 `default`)。詳細欄位定義請以官方文件的 NodeClass API 參考為準。
 
+### 7.7 Karpenter 新增 DRA(Dynamic Resource Allocation)支援:NVIDIA GPU / EFA(2026-10~11 新功能)
+
+> **來源**:[Karpenter v1.15.0 Release Notes](https://github.com/aws/karpenter-provider-aws/releases/tag/v1.15.0)、[Karpenter v1.15.2 Release Notes](https://github.com/aws/karpenter-provider-aws/releases/tag/v1.15.2)、Kubernetes 官方部落格〈[Kubernetes v1.34: DRA has graduated to GA](https://kubernetes.io/blog/2025/09/01/kubernetes-v1-34-dra-updates/)〉
+
+Kubernetes 的 **Dynamic Resource Allocation (DRA)** 用 `resource.k8s.io` API(`DeviceClass` / `ResourceClaim` / `ResourceSlice`)取代傳統的 device plugin 機制,讓排程器能理解「要哪一種裝置、要幾份」這類更細緻的硬體需求(例如切分單張 GPU、或要求特定網卡拓樸)。核心 API 已在 **v1.34** GA,並從 **v1.35** 起鎖定為 stable(對應的 feature gate 無法再關閉)。
+
+開源 **Karpenter**(EKS Auto Mode 底層所用的擴縮引擎,見 7.2 節)在 **v1.15.0**(2026-10-10)新增了 NVIDIA GPU 與 EFA 的 DRA driver 支援,由 alpha 等級的 AWS 專屬 feature gate 控制:
+
+```text
+settings.awsFeatureGates.draNVIDIAGPU   # 開啟 NVIDIA GPU 的 DRA 支援
+settings.awsFeatureGates.draEFA         # 開啟 EFA 的 DRA 支援
+settings.enableDRA                      # 總開關
+```
+
+這些 feature gate **預設關閉**,需要手動在 Karpenter Helm chart 設定中開啟才會生效。接著 **v1.15.2**(2026-11-12)更新了 DRA 相關的機型 metadata:新增 `g7` / `g7e` 機型的 NVIDIA GPU DRA 資料,並把 EFA DRA 涵蓋的機型數從 29 種擴大到 302 種。
+
+> **注意**:EKS Auto Mode 綁定自己內部的 Karpenter 版本與發布節奏,不一定與開源 Karpenter release 同步;Auto Mode 何時、以何種方式帶入這批 DRA 能力,請以 [AWS 官方 EKS Device Management 文件](https://docs.aws.amazon.com/eks/latest/userguide/device-management.html) 為準。本次審查時 `docs.aws.amazon.com` 在此環境的網路設定下無法連線驗證,因此這裡只記錄已能從開源 Karpenter 專案 GitHub release 頁面直接驗證到的版本資訊,下次審查應補上 AWS 官方文件的確認連結。
+
 ### 動手練習 7
 
 1. 用 `eksctl create nodegroup` 額外加一個 Spot 機型的 Node Group,觀察 Spot 與 On-Demand 的價差。
@@ -1169,6 +1187,7 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我知道目前 Managed Node Group 預設 AMI 是 AL2023,AL2 已停止發布新 AMI。
 - [ ] 我知道 EKS Auto Mode 與 Karpenter 節點池現在可直接宣告 EFA 網路介面與 EC2 Placement Group(cluster/spread/partition),適合分散式訓練/推論工作負載(見 7.5 節)。
 - [ ] 我知道 EKS Auto Mode NodeClass 現在可透過 `advancedCompute` 設定 kubelet 參數、核心 sysctl 與 hugepages,但內建的 `default` NodeClass/NodePool 不受影響也不應編輯(見 7.6 節)。
+- [ ] 我知道 Kubernetes DRA(Dynamic Resource Allocation)已於 v1.34 GA、v1.35 起 stable,開源 Karpenter 從 v1.15.0 起新增 NVIDIA GPU / EFA 的 DRA driver 支援(需手動開啟 feature gate,見 7.7 節)。
 
 **成本與清理(保命)**
 - [ ] 我在練習前就設好了 AWS Budget 告警。
