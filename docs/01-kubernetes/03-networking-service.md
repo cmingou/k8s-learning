@@ -306,6 +306,8 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main
 ```
 
 > ⚠️ **重要公告:Ingress NGINX 專案已於 2026 年 3 月退役**。Kubernetes Steering 與 Security Response Committee 聯合聲明,`ingress-nginx` 因長期僅有 1–2 位志工維護、且既有設計難以安全地繼續維護,已停止發布任何新版本、修補與安全更新;官方估計約 50% 的雲原生環境曾使用它,退役後**既有部署仍會繼續運作,但不會再有安全性修補**([Kubernetes 官方聲明:Ingress NGINX Retirement](https://kubernetes.io/blog/2026/01/29/ingress-nginx-statement/))。因此上面的指令僅適合本機教學用途;正式環境請改用 **Gateway API**(見 5.3 節)或其他仍在維護的 Ingress Controller(如 Traefik)。若要檢查叢集是否還在用它:`kubectl get pods --all-namespaces --selector app.kubernetes.io/name=ingress-nginx`。
+>
+> **退役後的實際案例(2026-11-05)**:**CVE-2026-116472**(`mirror-target` Ingress annotation 可觸及 ingress-nginx controller 內一個未驗證的設定 API、送出寫入指令,破壞資料後會讓**所有流量在下一次 Ingress 設定變更或 controller 重啟前持續被丟棄**,CVSS 3.1 僅 2.7 分 Low)被回報後,Kubernetes Security Response Committee 在追蹤 issue 中明確表示「**不會**針對此 CVE 發布修補,因為 ingress-nginx 的維護已於 2026 年 3 月結束」,該 issue 已標記 `cve/wontfix` 關閉;SUSE 則自行在其 fork(Rancher Prime RKE2 ingress-nginx)釋出 `1.15.2-prime1` 修補。這正是上方退役公告「不會再有安全性修補」的具體驗證,也代表後續任何 ingress-nginx CVE 都需自行用 admission controller 擋下風險 annotation(如本案可擋 `mirror-target`)或自行 fork 修補,官方不會再出手。詳見 [kubernetes/kubernetes#143852](https://github.com/kubernetes/kubernetes/issues/143852)。
 
 ### 5.2 Ingress 範例
 
