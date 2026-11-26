@@ -503,7 +503,9 @@ kubectl set env daemonset aws-node -n kube-system \
 
 ### 4.3 Pod 專屬 Security Group (Security Group for Pods)
 
-因為 Pod 拿的是 VPC 真實 IP,EKS 支援把 **[Security Group 直接套用到特定 Pod](https://docs.aws.amazon.com/eks/latest/userguide/security-groups-for-pods.html)**,做到 Pod 等級的網路隔離(例如:只有貼了某標籤的 Pod 才能連到 RDS)。這個功能同時支援 **EC2 節點**(大多數 Nitro 機型,但不含 `t` 系列)與 **[Fargate](https://aws.amazon.com/about-aws/whats-new/2021/06/amazon-eks-pods-running-aws-fargate-support-custom-security-groups/)**;但**不支援 Windows 節點,也不支援 EKS Auto Mode**。
+因為 Pod 拿的是 VPC 真實 IP,EKS 支援把 **[Security Group 直接套用到特定 Pod](https://docs.aws.amazon.com/eks/latest/userguide/security-groups-for-pods.html)**,做到 Pod 等級的網路隔離(例如:只有貼了某標籤的 Pod 才能連到 RDS)。這個功能同時支援 **EC2 節點**(大多數 Nitro 機型,但不含 `t` 系列)與 **[Fargate](https://aws.amazon.com/about-aws/whats-new/2021/06/amazon-eks-pods-running-aws-fargate-support-custom-security-groups/)**;但**不支援 Windows 節點**。
+
+> **更新(2026-11):EKS Auto Mode 現在也支援了**。過去 Auto Mode 不支援 Pod 專屬 Security Group,但 AWS 已讓**執行 Kubernetes 1.36 以上**的 Auto Mode 叢集具備等效能力:同樣透過 `SecurityGroupPolicy` 資源宣告(但 Auto Mode 用自己的 API 群組 `eks.amazonaws.com/v1`,而不是標準模式下方範例用的 `vpcresources.k8s.aws/v1beta1`),底層結合 Kubernetes Dynamic Resource Allocation (DRA) 與 EC2 branch network interface 實作,不另外收費。非 Auto Mode、或叢集版本較舊時,仍須用下方範例的 `vpcresources.k8s.aws/v1beta1` 寫法。詳見 AWS 官方〈[Assign security groups to individual pods in EKS Auto Mode](https://docs.aws.amazon.com/eks/latest/userguide/auto-sgp.html)〉。
 
 ```yaml
 # SecurityGroupPolicy:讓符合條件的 Pod 套用指定的 Security Group
