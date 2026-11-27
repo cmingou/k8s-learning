@@ -987,6 +987,24 @@ settings.enableDRA                      # 總開關
 
 > **更新(2026-11-09 AWS 官方公告,已確認)**:AWS 已發布〈[Amazon EKS Auto Mode and Karpenter now support Dynamic Resource Allocation](https://aws.amazon.com/about-aws/whats-new/2026/11/amazon-eks-auto-mode-karpenter-dra/)〉,正式確認 **EKS Auto Mode** 與**自管 Karpenter** 均已支援 NVIDIA GPU、EFA 的 DRA:在 **EKS Auto Mode** 中,NVIDIA DRA driver 與 EFA DRA driver(DRANET)已**內建**,使用者不需要(也無法)像上面自管 Karpenter 那樣手動開啟 `settings.awsFeatureGates.*` feature gate。兩者的 Kubernetes 版本要求不同:**自管 Karpenter 支援所有 Kubernetes 版本**(但仍需手動開啟 feature gate,見上);**EKS Auto Mode 則需 Kubernetes 1.36 以上**。另外,Auto Mode 會**避免同一種裝置類型**的 DRA 工作負載與傳統 device plugin 工作負載被排到同一批節點,降低遷移期間裝置被重複分配的風險。此功能已在**除 AWS GovCloud (US) 與中國區域外的所有 AWS 區域**提供,取代上一次審查留下的待確認事項。
 
+### 7.8 Auto Mode 新能力:Pod 資源重新調整大小 (Resource Optimization,2026-11 Preview 新功能)
+
+> **來源**:AWS 官方公告〈[Amazon EKS Auto Mode now rightsizes Pods to reduce compute costs (Preview)](https://aws.amazon.com/about-aws/whats-new/2026/11/eks-auto-mode-pod-rightsizing-preview/)〉、官方文件〈[Rightsize workloads with resource optimization](https://docs.aws.amazon.com/eks/latest/userguide/auto-resource-optimization.html)〉
+>
+> **方法論註記**:本次複查所在的執行環境網路政策未允許直接連線 `aws.amazon.com` / `docs.aws.amazon.com`(DNS 無法解析),故以上兩個官方連結本身雖真實存在,細節(發布時間、支援區域、API 物件與模式名稱等)是透過搜尋引擎彙整多個獨立第三方鏡像/報導(彼此交叉比對結果一致)驗證,而非直接讀取官方頁面全文。建議後續若此環境開通上述網域存取權限,應重新直接核對官方頁面以提高確定性。
+
+**EKS Auto Mode**(見 7.3 節)在 2026 年 11 月新增**資源優化 (Resource Optimization)** 功能,目前為 **Preview** 階段:它會依據 Pod 實際觀測到的用量,動態調整執行中 Pod 的 **CPU / 記憶體 requests**,目的是讓 Auto Mode 的自動 bin-packing 能用更少、更小的 EC2 執行個體跑相同工作負載,藉此降低運算成本——與本章 9.1 節「成本控制」的主題直接相關。
+
+- **需求**:僅限 **EKS Auto Mode** 叢集,且 Kubernetes 版本需為 **1.36 以上**。
+- **設定方式**:透過宣告式的 `ClusterResourceOptimizationPolicy` 物件啟用,提供兩種模式:
+  - **`Recommend`**:僅產生調整建議,不實際更動 Pod。
+  - **`Apply`**:實際**就地調整**執行中 Pod 的資源 requests。
+- **Preview 階段限制**:官方文件註明功能仍可能變動;僅支援 **`Balanced`** 一種最佳化 profile;**沒有自動回滾機制**——若要讓 Pod 的 requests 退回範本原值,需手動重新啟動該工作負載;EKS 主控台尚無對應的資源優化頁面。
+- **計費**:功能本身**不另外收費**。
+- 可用區域有限(僅在部分 AWS 區域提供),上線前請以官方文件為準核對當前支援的區域清單。
+
+與 7.6 節的 `advancedCompute`、7.7 節的 DRA 支援一樣,這是 **EKS Auto Mode** 持續補強「代管節省心力」與「使用者可調性/成本效益」兩端平衡的又一例子——值得在下一輪複查時追蹤其是否轉為正式 GA 功能、支援區域是否擴大。
+
 ### 動手練習 7
 
 1. 用 `eksctl create nodegroup` 額外加一個 Spot 機型的 Node Group,觀察 Spot 與 On-Demand 的價差。
@@ -1192,6 +1210,7 @@ aws ec2 describe-addresses            # 確認沒有閒置的 Elastic IP
 - [ ] 我知道 EKS Auto Mode 與 Karpenter 節點池現在可直接宣告 EFA 網路介面與 EC2 Placement Group(cluster/spread/partition),適合分散式訓練/推論工作負載(見 7.5 節)。
 - [ ] 我知道 EKS Auto Mode NodeClass 現在可透過 `advancedCompute` 設定 kubelet 參數、核心 sysctl 與 hugepages,但內建的 `default` NodeClass/NodePool 不受影響也不應編輯(見 7.6 節)。
 - [ ] 我知道 Kubernetes DRA(Dynamic Resource Allocation)已於 v1.34 GA、v1.35 起 stable,開源 Karpenter 從 v1.15.0 起新增 NVIDIA GPU / EFA 的 DRA driver 支援(需手動開啟 feature gate);EKS Auto Mode 已於 2026-11-09 隨官方公告確認內建支援(無需手動開 feature gate,但需 Kubernetes 1.36 以上),見 7.7 節。
+- [ ] 我知道 EKS Auto Mode 新增的資源優化 (Resource Optimization) 功能(2026-11,目前 Preview)能依實際用量動態調整執行中 Pod 的 CPU/記憶體 requests 以節省成本,透過 `ClusterResourceOptimizationPolicy` 的 `Recommend`/`Apply` 兩種模式啟用,需 Kubernetes 1.36 以上且目前無自動回滾機制,見 7.8 節。
 
 **成本與清理(保命)**
 - [ ] 我在練習前就設好了 AWS Budget 告警。
